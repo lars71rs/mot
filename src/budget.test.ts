@@ -62,10 +62,11 @@ describe('avvikslinje', () => {
       remainingToday: 269,
     })
     expect(v.paceNote).toBeNull()
-    expect(v.sumFits).toBe(true)
+    expect(v.unallocated).toBe(0)
+    expect(v.sumNote).toBeNull()
   })
 
-  it('sier ifra når sum plan ikke er fri pott', () => {
+  it('ufordelt er fri pott minus postene, og overforing flagges uten å slette tall', () => {
     const v = buildBudgetView({
       freePot: 14_072,
       plans: { ...plans, fritid: 8000 },
@@ -73,8 +74,22 @@ describe('avvikslinje', () => {
       now,
       remainingToday: 469,
     })
-    expect(v.sumFits).toBe(false)
-    expect(v.sumNote).toMatch(/^Fordelingen går ikke opp\. .+ for mye\.$/)
+    expect(v.rows.find((r) => r.id === 'fritid')?.plan).toBe(8000)
+    expect(v.unallocated).toBe(14_072 - (7000 + 8000 + 1400 + 2172))
+    expect(v.unallocated).toBeLessThan(0)
+    expect(v.sumNote).toMatch(/for mye fordelt/)
+  })
+
+  it('positiv ufordelt er rest, ikke sperre', () => {
+    const v = buildBudgetView({
+      freePot: 14_072,
+      plans: { mat: 1000, fritid: 0, transport: 0, annet: 0 },
+      expenses: [],
+      now,
+      remainingToday: 469,
+    })
+    expect(v.unallocated).toBe(13_072)
+    expect(v.sumNote).toBeNull()
   })
 
   it('redigert plan styrer igjen og tom-varsel', () => {

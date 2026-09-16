@@ -71,7 +71,7 @@ h1 {
 
 .shell .screen {
   flex: 1;
-  padding-bottom: 96px;
+  padding-bottom: 120px;
 }
 
 .wordmark {
@@ -365,8 +365,8 @@ h1 {
 
 .budget-figs {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
 }
 
 .budget-plan,
@@ -381,8 +381,8 @@ h1 {
   text-align: left;
 }
 
-.budget-plan span,
-.budget-num span {
+.budget-plan > span:first-child,
+.budget-num > span {
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -391,7 +391,9 @@ h1 {
 }
 
 .budget-plan-field,
+.budget-plan-field input,
 .budget-num strong {
+  font-size: 1.05rem;
   font-weight: 500;
   font-variant-numeric: tabular-nums lining-nums;
 }
@@ -401,16 +403,16 @@ h1 {
   align-items: baseline;
   gap: 4px;
   width: 100%;
-  min-height: 44px;
+  min-width: 0;
+  min-height: 40px;
   margin: 0;
-  padding: 8px 0;
+  padding: 6px 0;
   border: 0;
   border-bottom: 1px solid var(--ink);
   background: transparent;
   text-align: left;
   font: inherit;
   color: inherit;
-  cursor: pointer;
 }
 
 .budget-plan-field input {
@@ -419,7 +421,8 @@ h1 {
   border: 0;
   background: transparent;
   outline: none;
-  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 500;
   font-variant-numeric: tabular-nums lining-nums;
 }
 
@@ -433,6 +436,36 @@ h1 {
   margin: 0 0 1rem;
 }
 
+.budget-unallocated {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 0 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.budget-unallocated-note {
+  color: var(--muted);
+  margin: 4px 0 0;
+  font-size: 0.92rem;
+  font-weight: 400;
+}
+
+.budget-unallocated span {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.budget-unallocated strong {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-weight: 500;
+}
+
+.budget-over {
+  color: var(--rust);
+}
+
 .today-head {
   display: flex;
   justify-content: space-between;
@@ -441,10 +474,28 @@ h1 {
   margin-bottom: 0.6rem;
 }
 
-.today-head h2 {
+.today-head h2,
+.today-list > h2 {
   font-size: 1rem;
   font-weight: 600;
   margin: 0;
+}
+
+.today-list > h2 {
+  margin-bottom: 0.6rem;
+}
+
+.row-btn {
+  width: 100%;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.row-btn em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
 }
 
 .rows {
@@ -537,7 +588,7 @@ h1 {
   position: sticky;
   bottom: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   background: var(--paper);
   border-top: 1px solid var(--line);
   padding: 8px 4px calc(10px + env(safe-area-inset-bottom));

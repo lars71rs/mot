@@ -1,7 +1,14 @@
+import { toISODate } from './format'
 import type { AppState } from './types'
 
 function id(prefix: string, n: number): string {
   return `${prefix}-${n}`
+}
+
+function daysAgo(n: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return toISODate(d)
 }
 
 export function demoState(): AppState {
@@ -27,7 +34,36 @@ export function demoState(): AppState {
         active: true,
       },
     ],
-    expenses: [],
+    expenses: [
+      {
+        id: id('exp', 1),
+        amount: 450,
+        date: daysAgo(2),
+        category: 'mat',
+        createdAt: now,
+      },
+      {
+        id: id('exp', 2),
+        amount: 189,
+        date: daysAgo(0),
+        category: 'fritid',
+        createdAt: now,
+      },
+      {
+        id: id('exp', 3),
+        amount: 80,
+        date: daysAgo(5),
+        category: 'transport',
+        createdAt: now,
+      },
+      {
+        id: id('exp', 4),
+        amount: 320,
+        date: daysAgo(8),
+        category: 'mat',
+        createdAt: now,
+      },
+    ],
     budget: { customized: false, plans: { mat: 0, fritid: 0, transport: 0, annet: 0 } },
   }
 }

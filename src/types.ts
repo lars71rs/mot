@@ -51,10 +51,7 @@ export type Route =
   | { name: 'fixed'; fromOnboarding: boolean }
   | { name: 'home' }
   | { name: 'add-expense'; date?: string }
-  | { name: 'budget' }
-  | { name: 'budget-category'; post: BudgetPost }
-  | { name: 'goals' }
-  | { name: 'goal-edit'; id: string | 'new' }
+  | { name: 'category'; category: ExpenseCategory | null }
   | { name: 'settings' }
 
 export const GOAL_TYPES: { id: GoalType; label: string }[] = [

@@ -4,14 +4,10 @@ import { useStore } from '../store'
 
 export function Settings({
   onHome,
-  onBudget,
-  onGoals,
   onIncome,
   onFixed,
 }: {
   onHome: () => void
-  onBudget: () => void
-  onGoals: () => void
   onIncome: () => void
   onFixed: () => void
 }) {
@@ -24,8 +20,8 @@ export function Settings({
         <p className="kicker">Oppsett</p>
         <h1>Inntekt og faste</h1>
         <p className="lede">
-          Endringer her flytter dagsgrensen med en gang. Ingen bank, ingen
-          sky — alt ligger på denne enheten.
+          Rammen rundt kartet. Forbruk logger du selv. Ingen bank, ingen sky —
+          alt ligger på denne enheten.
         </p>
 
         <button type="button" className="settings-row" onClick={onIncome}>
@@ -61,13 +57,7 @@ export function Settings({
           Nullstill appen
         </button>
       </main>
-      <TabBar
-        active="settings"
-        onHome={onHome}
-        onBudget={onBudget}
-        onGoals={onGoals}
-        onSettings={() => {}}
-      />
+      <TabBar active="settings" onHome={onHome} onSettings={() => {}} />
     </div>
   )
 }

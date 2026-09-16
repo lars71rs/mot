@@ -6,7 +6,7 @@ import { GOAL_TYPES } from '../types'
 
 export function Goals({
   onHome,
-  onBudget,
+  onBudget: _onBudget,
   onSettings,
   onEdit,
 }: {
@@ -102,13 +102,7 @@ export function Goals({
           </button>
         </div>
       </main>
-      <TabBar
-        active="goals"
-        onHome={onHome}
-        onBudget={onBudget}
-        onGoals={() => {}}
-        onSettings={onSettings}
-      />
+      <TabBar active="home" onHome={onHome} onSettings={onSettings} />
     </div>
   )
 }

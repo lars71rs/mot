@@ -53,11 +53,13 @@ export function resolvedPlans(freePot: number, customized: boolean, stored: Budg
   return customized ? stored : suggestBudget(freePot)
 }
 
-export function distributionNote(planSum: number, freePot: number): string | null {
-  const diff = planSum - freePot
-  if (diff === 0) return null
-  if (diff > 0) return `Fordelingen går ikke opp. ${formatNok(diff)} for mye.`
-  return `Fordelingen går ikke opp. ${formatNok(-diff)} for lite.`
+export function unallocatedKr(freePot: number, plans: BudgetPlans): number {
+  return freePot - plans.mat - plans.fritid - plans.transport - plans.annet
+}
+
+export function distributionNote(unallocated: number): string | null {
+  if (unallocated < 0) return `${formatNok(-unallocated)} for mye fordelt.`
+  return null
 }
 
 export type BudgetRow = {
@@ -72,7 +74,7 @@ export type BudgetRow = {
 export type BudgetView = {
   freePot: number
   planSum: number
-  sumFits: boolean
+  unallocated: number
   sumNote: string | null
   paceNote: string | null
   rows: BudgetRow[]
@@ -111,14 +113,13 @@ export function buildBudgetView(args: {
   })
 
   const planSum = rows.reduce((s, r) => s + r.plan, 0)
-  const sumFits = planSum === freePot
-  const sumNote = distributionNote(planSum, freePot)
+  const unallocated = freePot - planSum
 
   return {
     freePot,
     planSum,
-    sumFits,
-    sumNote,
+    unallocated,
+    sumNote: distributionNote(unallocated),
     paceNote: paceNote(rows, remainingToday),
     rows,
   }

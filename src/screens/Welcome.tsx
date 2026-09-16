@@ -8,10 +8,10 @@ export function Welcome({
   return (
     <main className="screen welcome">
       <p className="wordmark">Mot</p>
-      <h1>Hva du kan bruke i dag uten å ødelegge målet.</h1>
+      <h1>Se hvor pengene går.</h1>
       <p className="lede">
-        Du legger inn inntekt og faste utgifter. Mot gir deg en dagsgrense. Et
-        sparemål er valgfritt — og strammer grensen når du lager et.
+        Du legger inn inntekt og faste. Så logger du det som går ut. Mot viser
+        hva du har brukt denne måneden — og på hva.
       </p>
       <div className="stack">
         <button type="button" className="btn-primary" onClick={onStart}>

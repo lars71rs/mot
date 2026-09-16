@@ -107,7 +107,7 @@ export function FixedExpenses({
             onNext()
           }}
         >
-          {fromOnboarding ? 'Vis dagsgrensen' : 'Lagre'}
+          {fromOnboarding ? 'Vis oversikten' : 'Lagre'}
         </button>
       </div>
     </main>

@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 import {
   buildBudgetView,
   freePotKr,
@@ -14,7 +14,7 @@ import { useStore } from '../store'
 
 export function Budget({
   onHome,
-  onGoals,
+  onGoals: _onGoals,
   onSettings,
   onOpenPost,
 }: {
@@ -46,8 +46,6 @@ export function Budget({
   })
 
   function commit(post: BudgetPost, amount: number) {
-    if (draft[post] === amount && state.budget.customized) return
-    if (draft[post] === amount && !state.budget.customized) return
     const next = { ...draft, [post]: amount }
     setDraft(next)
     saveBudgetPlans(next)
@@ -67,8 +65,8 @@ export function Budget({
           Fri pott {formatNok(view.freePot)} · {formatNok(engine.dailyPlan)}/dag
         </h1>
         <p className="lede">
-          Trykk på et planbeløp for å endre det i kroner. Dagsgrensen på Hjem
-          er sjefen.
+          Endre de fire postene fritt. Ufordelt er det som er igjen av potten.
+          Dagsgrensen på Hjem er sjefen.
         </p>
 
         <div className="budget-table">
@@ -83,9 +81,24 @@ export function Budget({
               onPlan={(n) => commit(row.id, n)}
             />
           ))}
+          <div className="budget-unallocated">
+            <div>
+              <span>Ufordelt</span>
+              {view.unallocated < 0 && (
+                <p className="budget-unallocated-note budget-over">{view.sumNote}</p>
+              )}
+              {view.unallocated > 0 && (
+                <p className="budget-unallocated-note">
+                  {formatNok(view.unallocated)} er ikke satt ennå.
+                </p>
+              )}
+            </div>
+            <strong className={view.unallocated < 0 ? 'budget-over' : ''}>
+              {formatNok(view.unallocated)}
+            </strong>
+          </div>
         </div>
 
-        {view.sumNote && <p className="warn">{view.sumNote}</p>}
         {view.paceNote && <p className="budget-note">{view.paceNote}</p>}
 
         <div className="stack">
@@ -94,13 +107,7 @@ export function Budget({
           </button>
         </div>
       </main>
-      <TabBar
-        active="budget"
-        onHome={onHome}
-        onBudget={() => {}}
-        onGoals={onGoals}
-        onSettings={onSettings}
-      />
+      <TabBar active="home" onHome={onHome} onSettings={onSettings} />
     </div>
   )
 }
@@ -120,26 +127,16 @@ function BudgetRow({
   onOpen: () => void
   onPlan: (n: number) => void
 }) {
-  const inputRef = useRef<HTMLInputElement>(null)
   const [raw, setRaw] = useState(String(plan))
-  const [editing, setEditing] = useState(false)
+  const [focused, setFocused] = useState(false)
 
-  function startEdit() {
-    setRaw(String(plan))
-    setEditing(true)
-    requestAnimationFrame(() => inputRef.current?.focus())
-  }
-
-  function finish() {
-    setEditing(false)
-    onPlan(amountFromField(raw))
+  function apply(nextRaw: string) {
+    setRaw(nextRaw)
+    onPlan(amountFromField(nextRaw))
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      inputRef.current?.blur()
-    }
+    if (e.key === 'Enter') e.currentTarget.blur()
   }
 
   return (
@@ -148,34 +145,27 @@ function BudgetRow({
         {label}
       </button>
       <div className="budget-figs">
-        <div className="budget-plan">
+        <label className="budget-plan">
           <span>Plan</span>
-          {editing ? (
-            <label className="budget-plan-field">
-              <input
-                ref={inputRef}
-                inputMode="numeric"
-                enterKeyHint="done"
-                aria-label={`Plan ${label}`}
-                value={raw}
-                onChange={(e) => setRaw(e.target.value.replace(/\D/g, ''))}
-                onBlur={finish}
-                onKeyDown={onKeyDown}
-              />
-              <em>kr</em>
-            </label>
-          ) : (
-            <button
-              type="button"
-              className="budget-plan-field"
-              onClick={startEdit}
-              aria-label={`Endre plan ${label}`}
-            >
-              {formatNokPlain(plan)}
-              <em>kr</em>
-            </button>
-          )}
-        </div>
+          <span className="budget-plan-field">
+            <input
+              inputMode="numeric"
+              enterKeyHint="done"
+              aria-label={`Plan ${label}`}
+              value={focused ? raw : formatNokPlain(plan)}
+              onFocus={() => {
+                setRaw(String(plan))
+                setFocused(true)
+              }}
+              onChange={(e) => apply(e.target.value.replace(/\D/g, ''))}
+              onBlur={() => {
+                setFocused(false)
+                onPlan(amountFromField(raw))
+              }}
+              onKeyDown={onKeyDown}
+            />
+          </span>
+        </label>
         <button type="button" className="budget-num" onClick={onOpen}>
           <span>Brukt</span>
           <strong>{formatNokPlain(used)}</strong>

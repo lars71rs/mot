@@ -1,20 +1,16 @@
 import { useEffect, useState } from 'react'
 import { AddExpense } from './screens/AddExpense'
-import { Budget } from './screens/Budget'
-import { BudgetCategory } from './screens/BudgetCategory'
+import { CategoryMonth } from './screens/CategoryMonth'
 import { FixedExpenses } from './screens/FixedExpenses'
-import { GoalEdit } from './screens/GoalEdit'
-import { Goals } from './screens/Goals'
 import { Home } from './screens/Home'
 import { Income } from './screens/Income'
 import { Settings } from './screens/Settings'
 import { Welcome } from './screens/Welcome'
-import { toISODate } from './format'
 import { useStore } from './store'
 import type { Route } from './types'
 
 export default function App() {
-  const { state, loadDemo, addExpense } = useStore()
+  const { state, loadDemo } = useStore()
   const [route, setRoute] = useState<Route>(() =>
     state.onboarded ? { name: 'home' } : { name: 'welcome' },
   )
@@ -26,15 +22,10 @@ export default function App() {
     if (params.get('demo') !== '1') return
     setDemoTried(true)
     loadDemo()
-    if (params.get('over') === '1') {
-      addExpense(600, toISODate(new Date()), 'fritid')
-    }
     setRoute({ name: 'home' })
-  }, [demoTried, loadDemo, addExpense])
+  }, [demoTried, loadDemo])
 
   const goHome = () => setRoute({ name: 'home' })
-  const goBudget = () => setRoute({ name: 'budget' })
-  const goGoals = () => setRoute({ name: 'goals' })
   const goSettings = () => setRoute({ name: 'settings' })
 
   if (!state.onboarded) {
@@ -85,42 +76,12 @@ export default function App() {
       )
     case 'add-expense':
       return <AddExpense onBack={goHome} onDone={goHome} />
-    case 'budget':
-      return (
-        <Budget
-          onHome={goHome}
-          onGoals={goGoals}
-          onSettings={goSettings}
-          onOpenPost={(post) => setRoute({ name: 'budget-category', post })}
-        />
-      )
-    case 'budget-category':
-      return (
-        <BudgetCategory post={route.post} onBack={goBudget} />
-      )
-    case 'goals':
-      return (
-        <Goals
-          onHome={goHome}
-          onBudget={goBudget}
-          onSettings={goSettings}
-          onEdit={(id) => setRoute({ name: 'goal-edit', id })}
-        />
-      )
-    case 'goal-edit':
-      return (
-        <GoalEdit
-          id={route.id}
-          onBack={goGoals}
-          onDone={goHome}
-        />
-      )
+    case 'category':
+      return <CategoryMonth category={route.category} onBack={goHome} />
     case 'settings':
       return (
         <Settings
           onHome={goHome}
-          onBudget={goBudget}
-          onGoals={goGoals}
           onIncome={() => setRoute({ name: 'income', fromOnboarding: false })}
           onFixed={() => setRoute({ name: 'fixed', fromOnboarding: false })}
         />
@@ -129,9 +90,8 @@ export default function App() {
       return (
         <Home
           onAdd={() => setRoute({ name: 'add-expense' })}
-          onBudget={goBudget}
-          onGoals={goGoals}
           onSettings={goSettings}
+          onCategory={(category) => setRoute({ name: 'category', category })}
         />
       )
   }

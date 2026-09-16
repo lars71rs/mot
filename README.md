@@ -1,8 +1,8 @@
 # Mot
 
-Personlig dagsgrense for unge voksne som sparer mot noe — i v1: egenkapital til bolig.
+Kart over økonomien for unge voksne: inntekt, faste og forbruk.
 
-Ikke et regnskap. En plan som sier hva du kan bruke i dag og i morgen uten å ødelegge målet.
+Ikke et tak. Et overblikk over hvor pengene går.
 
 Test: https://lars71rs.github.io/mot/
 
