@@ -8,10 +8,10 @@ export function Welcome({
   return (
     <main className="screen welcome">
       <p className="wordmark">Mot</p>
-      <h1>Se hvor pengene går.</h1>
+      <h1>Finansministeren din.</h1>
       <p className="lede">
-        Du legger inn inntekt og faste. Så logger du det som går ut. Mot viser
-        hva du har brukt denne måneden — og på hva.
+        Dump måneden fra nettbanken, eller si hva du lurer på. Ministeren leser
+        tavlen, peker på vaner, og kan flytte på den.
       </p>
       <div className="stack">
         <button type="button" className="btn-primary" onClick={onStart}>

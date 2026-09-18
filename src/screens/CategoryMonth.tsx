@@ -31,8 +31,10 @@ export function CategoryMonth({
           {items.map((e) => (
             <li key={e.id} className="row">
               <span>
-                <strong>{formatDate(e.date)}</strong>
-                <em>{formatNok(e.amount)}</em>
+                <strong>{e.note?.trim() ? e.note : formatDate(e.date)}</strong>
+                <em>
+                  {formatDate(e.date)} · {formatNok(e.amount)}
+                </em>
               </span>
               <button type="button" className="text-btn" onClick={() => removeExpense(e.id)}>
                 Slett

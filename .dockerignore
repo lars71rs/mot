@@ -1,0 +1,7 @@
+node_modules
+dist
+docs
+smoke
+.git
+.env
+*.md

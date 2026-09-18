@@ -1,18 +1,14 @@
 import { monthlySavingFor, planDoesNotFit } from '../engine'
 import { formatDuration, formatNok } from '../format'
-import { TabBar } from '../components/TabBar'
 import { useStore } from '../store'
 import { GOAL_TYPES } from '../types'
 
 export function Goals({
-  onHome,
-  onBudget: _onBudget,
-  onSettings,
   onEdit,
 }: {
-  onHome: () => void
-  onBudget: () => void
-  onSettings: () => void
+  onHome?: () => void
+  onBudget?: () => void
+  onSettings?: () => void
   onEdit: (id: string | 'new') => void
 }) {
   const { state, activateGoal, removeGoal } = useStore()
@@ -102,7 +98,6 @@ export function Goals({
           </button>
         </div>
       </main>
-      <TabBar active="home" onHome={onHome} onSettings={onSettings} />
     </div>
   )
 }

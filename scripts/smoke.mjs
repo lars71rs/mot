@@ -7,7 +7,7 @@ const out = new URL('../smoke', import.meta.url).pathname
 await mkdir(out, { recursive: true })
 const browser = await webkit.launch()
 const context = await browser.newContext({
-  viewport: { width: 390, height: 844 },
+  viewport: { width: 1280, height: 800 },
   locale: 'nb-NO',
 })
 const page = await context.newPage()
@@ -19,29 +19,59 @@ async function shot(name) {
 await page.goto(base, { waitUntil: 'networkidle' })
 await page.evaluate(() => localStorage.clear())
 await page.reload({ waitUntil: 'networkidle' })
-if (!(await page.getByRole('heading', { name: /hvor pengene går/i }).isVisible())) {
+if (!(await page.getByRole('heading', { name: /finansministeren/i }).isVisible())) {
   throw new Error('Velkomst vises ikke')
 }
 await shot('01-welcome')
 
 await page.goto(`${base}/?demo=1`, { waitUntil: 'networkidle' })
 await page.waitForTimeout(300)
-const homeText = await page.locator('body').innerText()
-if (!/brukt i/i.test(homeText)) {
-  throw new Error(`Hjem mangler brukt denne måneden:\n${homeText}`)
+const meetText = await page.locator('body').innerText()
+if (!/finansminister/i.test(meetText) || !/tavlen/i.test(meetText)) {
+  throw new Error(`Finansminister vises ikke:\n${meetText}`)
 }
-if (!/inntekt/i.test(homeText) || !/faste/i.test(homeText)) {
-  throw new Error(`Kartet mangler inntekt/faste:\n${homeText}`)
+if (!/inntekt/i.test(meetText) || !/i lomma/i.test(meetText)) {
+  throw new Error(`Tavlen mangler inntekt/i lomma:\n${meetText}`)
 }
-if (!/mat/i.test(homeText) || !/fritid/i.test(homeText)) {
-  throw new Error(`Kategorier mangler:\n${homeText}`)
+if (/i morgen/i.test(meetText) || /dagsgrense/i.test(meetText)) {
+  throw new Error(`Gammel flate vises fortsatt:\n${meetText}`)
 }
-if (/i morgen/i.test(homeText) || /dagsgrense/i.test(homeText) || /budsjett/i.test(homeText)) {
-  throw new Error(`Gammel flate vises fortsatt:\n${homeText}`)
+if (!(await page.locator('.sidebar').isVisible())) {
+  throw new Error('Sidemeny vises ikke')
 }
 await shot('02-home-demo')
 
-await page.getByRole('button', { name: 'Legg inn utgift' }).click()
+await page.getByRole('button', { name: 'Bankfil' }).click()
+await page.waitForTimeout(200)
+if (!(await page.getByRole('heading', { name: /dump en fil/i }).isVisible())) {
+  throw new Error('Bankfil-skjermen vises ikke')
+}
+const csv = `Dato;Forklaring;Ut av konto;Inn på konto
+17.09.2026;REMA 1000 TEST;89,00;
+16.09.2026;Lønn;;27000,00
+`
+await page.locator('input[type="file"]').setInputFiles({
+  name: 'dnb.csv',
+  mimeType: 'text/csv',
+  buffer: Buffer.from(csv),
+})
+await page.waitForTimeout(300)
+const importText = await page.locator('body').innerText()
+if (!/utgifter klare/i.test(importText) || !/innbetalinger hoppes over/i.test(importText)) {
+  throw new Error(`CSV ble ikke lest:\n${importText}`)
+}
+await page.getByRole('button', { name: 'Legg inn i kartet' }).click()
+await page.waitForTimeout(200)
+await page.getByRole('button', { name: 'Til oversikten' }).click()
+await page.waitForTimeout(200)
+const afterImport = await page.locator('body').innerText()
+if (!/rema|mat/i.test(afterImport)) {
+  throw new Error(`Import landet ikke på kartet:\n${afterImport}`)
+}
+await shot('02b-import')
+await page.getByRole('button', { name: 'Tavlen' }).click()
+
+await page.locator('.sidebar').getByRole('button', { name: 'Legg inn utgift' }).click()
 await page.waitForTimeout(200)
 const focused = await page
   .locator('.amount-field input')
@@ -58,6 +88,8 @@ if (!after.includes('600') && !after.includes('789')) {
 }
 await shot('04-home-after-expense')
 
+await page.getByRole('button', { name: 'Tavlen' }).click()
+await page.waitForTimeout(200)
 await page.getByRole('button', { name: 'Fritid' }).first().click()
 await page.waitForTimeout(200)
 if (!(await page.getByRole('heading', { name: 'Fritid' }).isVisible())) {
@@ -81,8 +113,8 @@ await page.getByRole('button', { name: 'Legg til' }).click()
 await page.getByRole('button', { name: 'Vis oversikten' }).click()
 await page.waitForTimeout(300)
 const afterOnboard = await page.locator('body').innerText()
-if (!/brukt i/i.test(afterOnboard)) {
-  throw new Error(`Onboarding landet ikke på kartet:\n${afterOnboard}`)
+if (!/finansminister/i.test(afterOnboard)) {
+  throw new Error(`Onboarding landet ikke hos finansministeren:\n${afterOnboard}`)
 }
 await shot('07-home-after-onboard')
 

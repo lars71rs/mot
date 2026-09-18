@@ -24,6 +24,7 @@ export type Expense = {
   amount: number
   date: string
   category: ExpenseCategory | null
+  note?: string
   createdAt: string
 }
 
@@ -50,8 +51,10 @@ export type Route =
   | { name: 'income'; fromOnboarding: boolean }
   | { name: 'fixed'; fromOnboarding: boolean }
   | { name: 'home' }
+  | { name: 'meet' }
   | { name: 'add-expense'; date?: string }
   | { name: 'category'; category: ExpenseCategory | null }
+  | { name: 'import' }
   | { name: 'settings' }
 
 export const GOAL_TYPES: { id: GoalType; label: string }[] = [

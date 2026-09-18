@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { spentByCategory, spentThisMonth, spentThisWeek } from './map'
+import { inPocket, spentByCategory, spentThisMonth, spentThisWeek } from './map'
 
 function onDay(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number)
@@ -21,6 +21,10 @@ describe('kart over forbruk', () => {
   it('denne uka er mandag–i dag', () => {
     // 16. sep 2026 er onsdag, uke starter 14. sep
     expect(spentThisWeek(expenses, onDay('2026-09-16'))).toBe(200 + 80)
+  })
+
+  it('i lomma er inntekt minus faste minus forbruk', () => {
+    expect(inPocket(32_000, 12_199, 680)).toBe(19_121)
   })
 
   it('fordeler på kategori, størst først', () => {

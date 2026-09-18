@@ -19,8 +19,8 @@
 html,
 body {
   margin: 0;
-  min-height: 100%;
-  background: #241f1b;
+  height: 100%;
+  background: var(--paper);
   color: var(--ink);
   font-family: Figtree, 'Source Sans 3', sans-serif;
   font-size: 17px;
@@ -28,16 +28,7 @@ body {
 }
 
 #root {
-  min-height: 100dvh;
-  display: flex;
-  justify-content: center;
-}
-
-#root > * {
-  width: 100%;
-  max-width: 430px;
-  min-height: 100dvh;
-  background: var(--paper);
+  height: 100%;
 }
 
 button,
@@ -60,18 +51,214 @@ h1 {
 }
 
 .screen {
-  padding: calc(20px + env(safe-area-inset-top)) 22px 32px;
+  padding: 8px 0 40px;
+}
+
+.desk {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: auto;
+  padding: 28px 18px;
+  border-right: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+.sidebar .wordmark {
+  margin: 0 8px 2rem;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar nav button {
+  background: none;
+  border: 0;
+  text-align: left;
+  padding: 10px 12px;
+  color: var(--muted);
+}
+
+.sidebar nav button.on {
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.desk-main {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  padding: 36px 48px 56px;
+}
+
+.desk-main .screen {
+  max-width: 920px;
+}
+
+.desk-main-meet {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 28px 16px;
+}
+
+.desk-main-meet .screen {
+  max-width: none;
+}
+
+.meet {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 28px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.meet-chat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.meet-chat h1 {
+  flex-shrink: 0;
+  margin-bottom: 0.6rem;
+}
+
+.meet-chat .warn,
+.meet-chat .lede {
+  flex-shrink: 0;
+}
+
+.meet-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 0 16px;
+  border-top: 1px solid var(--line);
+}
+
+.bubble {
+  max-width: 52ch;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  white-space: pre-wrap;
+}
+
+.bubble-user {
+  background: var(--paper-2);
+  margin-left: auto;
+}
+
+.bubble-assistant {
+  border: 1px solid var(--line);
+}
+
+.meet-compose {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+  padding-top: 8px;
+}
+
+.meet-compose .btn-primary {
+  max-width: none;
+  padding: 10px 16px;
+}
+
+.meet-attach {
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.meet-board {
+  border-left: 1px solid var(--line);
+  padding-left: 24px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.meet-spent {
+  font-family: Fraunces, Georgia, serif;
+  font-size: 2.2rem;
+  font-weight: 560;
+  letter-spacing: -0.04em;
+  margin: 0.2rem 0 1rem;
+}
+
+.meet-spent span {
+  font-size: 1rem;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+
+.desk-main .stack .btn-primary,
+.desk-main .stack .btn-secondary {
+  max-width: 280px;
+}
+
+.dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  padding: 24px;
+  margin: 0 0 1.2rem;
+  border: 1px dashed var(--ink);
+  color: var(--muted);
+  text-align: center;
+  cursor: pointer;
+}
+
+.dropzone-on {
+  background: var(--paper-2);
+}
+
+.gate {
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  background: var(--paper);
+}
+
+.gate .screen {
+  width: 100%;
+  max-width: 520px;
+  padding: 64px 32px;
+}
+
+.home-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 48px 56px;
+  align-items: start;
+  margin-bottom: 2.5rem;
 }
 
 .shell {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-}
-
-.shell .screen {
-  flex: 1;
-  padding-bottom: 120px;
+  min-height: 100%;
 }
 
 .wordmark {
@@ -228,12 +415,12 @@ h1 {
 }
 
 .hero {
-  margin: 1.8rem 0 1.2rem;
+  margin: 0;
 }
 
 .hero-number {
   font-family: Fraunces, Georgia, serif;
-  font-size: clamp(4.2rem, 22vw, 5.8rem);
+  font-size: clamp(3.8rem, 7vw, 5.4rem);
   font-weight: 560;
   letter-spacing: -0.05em;
   line-height: 0.9;
@@ -303,6 +490,11 @@ h1 {
   margin: 0;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.pocket-over dt,
+.pocket-over dd {
+  color: var(--rust);
 }
 
 .status-ok {

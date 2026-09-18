@@ -38,12 +38,16 @@ type Store = {
   activateGoal: (id: string | null) => void
   removeGoal: (id: string) => void
   addExpense: (amount: number, date: string, category: ExpenseCategory | null) => void
+  importExpenses: (
+    items: { amount: number; date: string; category: ExpenseCategory | null; note: string }[],
+  ) => { added: number; duplicates: number }
   removeExpense: (id: string) => void
   saveBudgetPlans: (plans: BudgetPlans) => void
   resetBudget: () => void
   completeOnboarding: () => void
   loadDemo: () => void
   resetAll: () => void
+  replaceState: (next: AppState) => void
 }
 
 const StoreContext = createContext<Store | null>(null)
@@ -120,6 +124,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             },
           ],
         })),
+      importExpenses: (items) => {
+        const have = new Set(
+          state.expenses.map(
+            (e) => `${e.date}|${e.amount}|${(e.note ?? '').slice(0, 48).toLowerCase()}`,
+          ),
+        )
+        const extra: Expense[] = []
+        let duplicates = 0
+        const now = new Date().toISOString()
+        for (const item of items) {
+          const key = `${item.date}|${item.amount}|${item.note.slice(0, 48).toLowerCase()}`
+          if (have.has(key)) {
+            duplicates++
+            continue
+          }
+          have.add(key)
+          extra.push({
+            id: newId(),
+            amount: item.amount,
+            date: item.date,
+            category: item.category,
+            note: item.note,
+            createdAt: now,
+          })
+        }
+        if (extra.length) {
+          commit((s) => ({ ...s, expenses: [...s.expenses, ...extra] }))
+        }
+        return { added: extra.length, duplicates }
+      },
       removeExpense: (id) =>
         commit((s) => ({
           ...s,
@@ -142,6 +176,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       completeOnboarding: () => commit((s) => ({ ...s, onboarded: true })),
       loadDemo: () => commit(() => demoState()),
       resetAll: () => commit(() => emptyState()),
+      replaceState: (next) => commit(() => next),
     }),
     [state, commit],
   )

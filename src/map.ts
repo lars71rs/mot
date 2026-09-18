@@ -26,6 +26,14 @@ export function spentThisMonth(expenses: Pick<Expense, 'amount' | 'date'>[], now
   return expenses.filter((e) => inMonth(e.date, now)).reduce((s, e) => s + e.amount, 0)
 }
 
+export function inPocket(
+  monthlyIncome: number,
+  fixedTotal: number,
+  spentMonth: number,
+): number {
+  return monthlyIncome - fixedTotal - spentMonth
+}
+
 export function spentThisWeek(expenses: Pick<Expense, 'amount' | 'date'>[], now: Date): number {
   const from = toISODate(startOfIsoWeek(now))
   const to = toISODate(now)

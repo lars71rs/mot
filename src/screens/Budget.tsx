@@ -7,20 +7,16 @@ import {
   type BudgetPlans,
   type BudgetPost,
 } from '../budget'
-import { TabBar } from '../components/TabBar'
 import { activeGoal, calculate } from '../engine'
 import { amountFromField, formatNok, formatNokPlain } from '../format'
 import { useStore } from '../store'
 
 export function Budget({
-  onHome,
-  onGoals: _onGoals,
-  onSettings,
   onOpenPost,
 }: {
-  onHome: () => void
-  onGoals: () => void
-  onSettings: () => void
+  onHome?: () => void
+  onGoals?: () => void
+  onSettings?: () => void
   onOpenPost: (post: BudgetPost) => void
 }) {
   const { state, saveBudgetPlans, resetBudget } = useStore()
@@ -58,7 +54,7 @@ export function Budget({
   }
 
   return (
-    <div className="shell">
+    <div>
       <main className="screen">
         <p className="kicker">Budsjett</p>
         <h1>
@@ -107,7 +103,6 @@ export function Budget({
           </button>
         </div>
       </main>
-      <TabBar active="home" onHome={onHome} onSettings={onSettings} />
     </div>
   )
 }
