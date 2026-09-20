@@ -1,46 +1,82 @@
+import { useState } from 'react'
 import { formatNok } from '../format'
 import { useStore } from '../store'
 
-export function Settings({
-  onIncome,
-  onFixed,
-  onReset,
-}: {
-  onIncome: () => void
-  onFixed: () => void
-  onReset: () => void
-}) {
-  const { state, resetAll } = useStore()
-  const total = state.fixed.reduce((s, f) => s + f.amount, 0)
+export function Settings({ onReset }: { onReset: () => void }) {
+  const { state, setProfile, setSavingsGoal, resetAll } = useStore()
+  const [name, setName] = useState(state.displayName)
+  const [year, setYear] = useState(state.birthYear ? String(state.birthYear) : '')
+  const goal = state.goals.find((g) => g.active) ?? null
+  const [goalName, setGoalName] = useState(goal?.name ?? '')
+  const [goalAmount, setGoalAmount] = useState(goal ? String(goal.targetAmount) : '')
 
   return (
     <main className="screen">
       <p className="kicker">Oppsett</p>
-      <h1>Inntekt og faste</h1>
+      <h1>Deg og målet</h1>
       <p className="lede">
-        Rammen rundt kartet. Forbruk logger du selv. Ingen bank, ingen sky —
-        alt ligger på denne enheten.
+        Faste og inntekt kommer fra utskriften og ministeren. Her retter du navn, år og
+        sparemål.
       </p>
 
-      <button type="button" className="settings-row" onClick={onIncome}>
-        <span>
-          <strong>Månedsinntekt etter skatt</strong>
-          <em>{formatNok(state.monthlyIncome)}</em>
-        </span>
-        <span className="chev">Endre</span>
-      </button>
+      <label className="field-label" htmlFor="set-name">
+        Navn
+      </label>
+      <input
+        id="set-name"
+        className="text-input"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={() => {
+          const y = Number(year)
+          if (name.trim()) setProfile(name.trim(), y >= 1940 ? y : state.birthYear ?? 2000)
+        }}
+      />
 
-      <button type="button" className="settings-row" onClick={onFixed}>
-        <span>
-          <strong>Faste utgifter</strong>
-          <em>
-            {state.fixed.length === 0
-              ? 'Ingen'
-              : `${state.fixed.length} stk · ${formatNok(total)}`}
-          </em>
-        </span>
-        <span className="chev">Endre</span>
-      </button>
+      <label className="field-label" htmlFor="set-year">
+        Fødselsår
+      </label>
+      <input
+        id="set-year"
+        className="text-input"
+        inputMode="numeric"
+        value={year}
+        onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+        onBlur={() => {
+          const y = Number(year)
+          if (y >= 1940 && y <= 2015) setProfile(name.trim() || state.displayName, y)
+        }}
+      />
+
+      <label className="field-label" htmlFor="set-goal-name">
+        Sparemål
+      </label>
+      <input
+        id="set-goal-name"
+        className="text-input"
+        placeholder="Egenkapital"
+        value={goalName}
+        onChange={(e) => setGoalName(e.target.value)}
+      />
+      <input
+        className="text-input"
+        inputMode="numeric"
+        placeholder="Beløp"
+        value={goalAmount}
+        onChange={(e) => setGoalAmount(e.target.value)}
+        onBlur={() => {
+          const amount = Math.round(Number(goalAmount.replace(/\s/g, '')))
+          if (amount > 0) setSavingsGoal(goalName.trim() || 'Sparing', amount)
+        }}
+      />
+      {goal ? <p className="hint">Mål: {formatNok(goal.targetAmount)}</p> : null}
+
+      {state.fixed.length > 0 && (
+        <p className="hint">
+          Faste ministeren har lagt inn:{' '}
+          {state.fixed.map((f) => `${f.name} ${formatNok(f.amount)}`).join(', ')}
+        </p>
+      )}
 
       <button
         type="button"

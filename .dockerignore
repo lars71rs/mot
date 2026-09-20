@@ -4,4 +4,7 @@ docs
 smoke
 .git
 .env
+.env.*
 *.md
+tmp-items.mjs
+

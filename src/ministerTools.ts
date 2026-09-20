@@ -1,13 +1,31 @@
-import { guessCategory, parseBankCsv } from './bankCsv'
-import { inPocket, spentByCategory, spentThisMonth, spentThisWeek } from './map'
-import type { AppState, Expense, ExpenseCategory, FixedExpense } from './types'
+import { guessCategory, parseBankStatement } from './bankCsv'
+import {
+  dateFromMonthKey,
+  incomeThisMonth,
+  leftoverThisMonth,
+  monthsWithActivity,
+  spentByCategory,
+  spentByMonth,
+  spentThisMonth,
+  spentThisWeek,
+} from './map'
+import type { AppState, Expense, ExpenseCategory, FixedExpense, Goal } from './types'
 
 export type ToolResult = {
   state: AppState
   result: unknown
 }
 
-const CATEGORIES: ExpenseCategory[] = ['mat', 'fritid', 'transport', 'klaer', 'annet']
+const CATEGORIES: ExpenseCategory[] = [
+  'bolig',
+  'mat',
+  'fritid',
+  'transport',
+  'klaer',
+  'helse',
+  'abonnement',
+  'annet',
+]
 
 function cloneState(s: AppState): AppState {
   return JSON.parse(JSON.stringify(s)) as AppState
@@ -17,20 +35,38 @@ function newId(): string {
   return crypto.randomUUID()
 }
 
-function overview(state: AppState, now: Date) {
-  const fixedTotal = state.fixed.reduce((s, f) => s + f.amount, 0)
-  const spentMonth = spentThisMonth(state.expenses, now)
-  const spentWeek = spentThisWeek(state.expenses, now)
-  const pocket = inPocket(state.monthlyIncome, fixedTotal, spentMonth)
+function boardDate(state: AppState, now: Date, monthArg?: string): Date {
+  if (monthArg && /^\d{4}-\d{2}$/.test(monthArg)) return dateFromMonthKey(monthArg)
+  if (incomeThisMonth(state.expenses, now) > 0 || spentThisMonth(state.expenses, now) > 0) {
+    return now
+  }
+  const months = monthsWithActivity(state.expenses)
+  return months[0] ? dateFromMonthKey(months[0]) : now
+}
+
+function overview(state: AppState, now: Date, monthArg?: string) {
+  const view = boardDate(state, now, monthArg)
+  const income = incomeThisMonth(state.expenses, view)
+  const spent = spentThisMonth(state.expenses, view)
+  const leftover = leftoverThisMonth(state.expenses, view)
+  const goal = state.goals.find((g) => g.active) ?? null
+  const month = `${view.getFullYear()}-${String(view.getMonth() + 1).padStart(2, '0')}`
   return {
-    monthlyIncome: state.monthlyIncome,
-    fixedTotal,
+    name: state.displayName,
+    birthYear: state.birthYear,
+    month,
+    income,
+    spent,
+    spentThisMonth: spent,
+    leftover,
+    savedThisMonth: leftover > 0 ? leftover : 0,
+    usedFromSavings: leftover < 0 ? -leftover : 0,
+    goal: goal ? { name: goal.name, target: goal.targetAmount } : null,
     fixed: state.fixed.map((f) => ({ id: f.id, name: f.name, amount: f.amount })),
-    spentThisMonth: spentMonth,
-    spentThisWeek: spentWeek,
-    inPocket: pocket,
-    byCategory: spentByCategory(state.expenses, now),
-    expenseCount: state.expenses.length,
+    byCategory: spentByCategory(state.expenses, view),
+    byMonth: spentByMonth(state.expenses),
+    spentThisWeek: spentThisWeek(state.expenses, now),
+    txCount: state.expenses.length,
   }
 }
 
@@ -39,17 +75,22 @@ export const MINISTER_TOOLS = [
     type: 'function' as const,
     name: 'get_board',
     description:
-      'Les tavlen: inntekt, faste, forbruk denne måneden/uka, i lomma, og forbruk per kategori.',
-    parameters: { type: 'object', properties: {}, additionalProperties: false },
+      'Les kartet: inn, ut, igjen, sparing, faste, kategorier og byMonth. Uten month: måneden med data, ellers i dag.',
+    parameters: {
+      type: 'object',
+      properties: { month: { type: 'string', description: 'YYYY-MM' } },
+      additionalProperties: false,
+    },
   },
   {
     type: 'function' as const,
     name: 'list_expenses',
-    description: 'List utgifter. Uten filter: denne kalendermåneden.',
+    description: 'List utgifter. Uten filter: denne kalendermåneden. Bruk month fra byMonth for andre måneder.',
     parameters: {
       type: 'object',
       properties: {
         category: { type: 'string', enum: [...CATEGORIES, 'ukjent'] },
+        month: { type: 'string', description: 'YYYY-MM. Utelat for inneværende måned.' },
         limit: { type: 'integer', minimum: 1, maximum: 80 },
       },
       additionalProperties: false,
@@ -66,8 +107,9 @@ export const MINISTER_TOOLS = [
         date: { type: 'string', description: 'YYYY-MM-DD. Utelat for i dag.' },
         category: { type: 'string', enum: CATEGORIES },
         note: { type: 'string' },
+        direction: { type: 'string', enum: ['in', 'out'] },
       },
-      required: ['amount', 'date'],
+      required: ['amount'],
       additionalProperties: false,
     },
   },
@@ -136,11 +178,38 @@ export const MINISTER_TOOLS = [
     type: 'function' as const,
     name: 'import_bank_csv',
     description:
-      'Les en CSV/TXT fra norsk nettbank. Legger utgående i forbruk. Hopper over inn på konto (lønn). Hopper over duplikater.',
+      'Les CSV/TXT fra norsk nettbank. Legger både inn og ut på kartet. Hopper over duplikater.',
     parameters: {
       type: 'object',
       properties: { csv: { type: 'string', description: 'Hele filinnholdet' } },
       required: ['csv'],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: 'function' as const,
+    name: 'set_profile',
+    description: 'Oppdater navn og/eller fødselsår.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        birthYear: { type: 'integer' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    type: 'function' as const,
+    name: 'set_savings_goal',
+    description: 'Sett ett sparemål (navn og beløp). Erstatter forrige mål.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        amount: { type: 'number' },
+      },
+      required: ['amount'],
       additionalProperties: false,
     },
   },
@@ -214,11 +283,16 @@ export function runMinisterTool(
 
   switch (name) {
     case 'get_board':
-      return { state: s, result: overview(s, now) }
+      return {
+        state: s,
+        result: overview(s, now, typeof args.month === 'string' ? args.month : undefined),
+      }
     case 'list_expenses': {
       const cat = typeof args.category === 'string' ? args.category : null
       const limit = typeof args.limit === 'number' ? args.limit : 40
-      let list = s.expenses.filter((e) => e.date.startsWith(monthPrefixLocal(now)))
+      const monthArg = typeof args.month === 'string' ? args.month.trim() : ''
+      const prefix = /^\d{4}-\d{2}$/.test(monthArg) ? `${monthArg}-` : monthPrefixLocal(now)
+      let list = s.expenses.filter((e) => e.date.startsWith(prefix))
       if (cat === 'ukjent') list = list.filter((e) => !e.category)
       else if (cat && CATEGORIES.includes(cat as ExpenseCategory)) {
         list = list.filter((e) => e.category === cat)
@@ -230,6 +304,7 @@ export function runMinisterTool(
           id: e.id,
           date: e.date,
           amount: e.amount,
+          direction: e.direction,
           category: e.category,
           note: e.note ?? '',
         })),
@@ -247,11 +322,13 @@ export function runMinisterTool(
           ? (args.category as ExpenseCategory)
           : null
       const note = typeof args.note === 'string' ? args.note : undefined
+      const direction = args.direction === 'in' ? 'in' : 'out'
       const row: Expense = {
         id: newId(),
         amount,
         date,
-        category,
+        direction,
+        category: direction === 'in' ? null : category,
         note,
         createdAt: new Date().toISOString(),
       }
@@ -296,18 +373,30 @@ export function runMinisterTool(
     }
     case 'import_bank_csv': {
       const csv = String(args.csv ?? '')
-      const parsed = parseBankCsv(csv)
-      if (parsed.error) return { state: s, result: { error: parsed.error } }
+      const parsed = parseBankStatement(csv)
+      if (parsed.error) {
+        return {
+          state: s,
+          result: {
+            error: parsed.error,
+            skipped: parsed.skipped,
+            preview: csv.replace(/\s+/g, ' ').trim().slice(0, 400),
+          },
+        }
+      }
       const have = new Set(
-        s.expenses.map((e) => `${e.date}|${e.amount}|${(e.note ?? '').slice(0, 48).toLowerCase()}`),
+        s.expenses.map(
+          (e) =>
+            `${e.date}|${e.amount}|${(e.note ?? '').slice(0, 48).toLowerCase()}|${e.direction}`,
+        ),
       )
       let added = 0
+      let addedIn = 0
       let duplicates = 0
-      const incoming = parsed.rows.filter((r) => r.direction === 'in').length
       const nowIso = new Date().toISOString()
       const extra: Expense[] = []
-      for (const row of parsed.rows.filter((r) => r.direction === 'out')) {
-        const key = `${row.date}|${row.amount}|${row.text.slice(0, 48).toLowerCase()}`
+      for (const row of parsed.rows) {
+        const key = `${row.date}|${row.amount}|${row.text.slice(0, 48).toLowerCase()}|${row.direction}`
         if (have.has(key)) {
           duplicates++
           continue
@@ -317,22 +406,57 @@ export function runMinisterTool(
           id: newId(),
           amount: row.amount,
           date: row.date,
-          category: guessCategory(row.text),
+          direction: row.direction,
+          category: row.direction === 'in' ? null : guessCategory(row.text),
           note: row.text,
           createdAt: nowIso,
         })
         added++
+        if (row.direction === 'in') addedIn++
       }
       s.expenses = [...s.expenses, ...extra]
       return {
         state: s,
         result: {
           added,
+          addedIn,
+          addedOut: added - addedIn,
           duplicates,
-          incomingSkipped: incoming,
+          months: spentByMonth(extra),
+          sample: extra.slice(0, 12).map((e) => ({
+            date: e.date,
+            amount: e.amount,
+            direction: e.direction,
+            note: e.note ?? '',
+          })),
           board: overview(s, now),
         },
       }
+    }
+    case 'set_profile': {
+      const name = typeof args.name === 'string' ? args.name.trim() : ''
+      const year = Math.round(Number(args.birthYear))
+      if (name) s.displayName = name
+      if (year >= 1940 && year <= 2020) s.birthYear = year
+      return { state: s, result: { ok: true, board: overview(s, now) } }
+    }
+    case 'set_savings_goal': {
+      const amount = Math.round(Number(args.amount))
+      const name = String(args.name ?? '').trim() || 'Sparing'
+      if (!amount || amount <= 0) return { state: s, result: { error: 'Ugyldig mål' } }
+      const existing = s.goals.find((g) => g.active) ?? s.goals[0]
+      const goal: Goal = {
+        id: existing?.id ?? newId(),
+        type: existing?.type ?? 'egenkapital',
+        name,
+        targetAmount: amount,
+        alreadySaved: existing?.alreadySaved ?? 0,
+        months: existing?.months ?? 12,
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+        active: true,
+      }
+      s.goals = [goal]
+      return { state: s, result: { ok: true, board: overview(s, now) } }
     }
     default:
       return { state: s, result: { error: `Ukjent verktøy: ${name}` } }

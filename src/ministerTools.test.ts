@@ -16,9 +16,14 @@ describe('minister-verktøy', () => {
       now,
     )
     s = add.state
-    const board = runMinisterTool('get_board', {}, s, now).result as { spentThisMonth: number; inPocket: number }
+    const board = runMinisterTool('get_board', {}, s, now).result as {
+      spentThisMonth: number
+      leftover: number
+      usedFromSavings: number
+    }
     expect(board.spentThisMonth).toBe(189)
-    expect(board.inPocket).toBe(27_000 - 189)
+    expect(board.leftover).toBe(-189)
+    expect(board.usedFromSavings).toBe(189)
   })
 
   it('plukker utgifter ut av setninger', () => {
@@ -45,9 +50,51 @@ describe('minister-verktøy', () => {
 17.09.2026;REMA 1000;120,00;
 16.09.2026;Lønn;;27000,00`
     const r = runMinisterTool('import_bank_csv', { csv }, emptyState(), now)
-    const board = (r.result as { added: number; incomingSkipped: number; board: { spentThisMonth: number } })
-    expect(board.added).toBe(1)
-    expect(board.incomingSkipped).toBe(1)
+    const board = r.result as {
+      added: number
+      addedIn: number
+      board: { spentThisMonth: number; income: number }
+    }
+    expect(board.added).toBe(2)
+    expect(board.addedIn).toBe(1)
     expect(board.board.spentThisMonth).toBe(120)
+    expect(board.board.income).toBe(27_000)
+  })
+
+  it('legger august-utskrift i byMonth, ikke september', () => {
+    const text = `28.08.2026 REMA 1000 SCHOUS 189,00 12.411,20
+15.08.2026 Vipps*Kiosk 67,00-`
+    const r = runMinisterTool('import_bank_csv', { csv: text }, emptyState(), now)
+    const out = r.result as {
+      added: number
+      months: { month: string; amount: number }[]
+      board: {
+        month: string
+        spent: number
+        spentThisMonth: number
+        byMonth: { month: string; amount: number }[]
+      }
+    }
+    expect(out.added).toBe(2)
+    expect(out.board.month).toBe('2026-08')
+    expect(out.board.spent).toBe(256)
+    expect(out.board.byMonth).toEqual([{ month: '2026-08', amount: 256 }])
+  })
+
+  it('lister utgifter for valgt måned', () => {
+    let s = emptyState()
+    s = runMinisterTool(
+      'add_expense',
+      { amount: 189, date: '2026-08-28', note: 'REMA' },
+      s,
+      now,
+    ).state
+    const list = runMinisterTool('list_expenses', { month: '2026-08' }, s, now).result as {
+      amount: number
+    }[]
+    expect(list).toHaveLength(1)
+    expect(list[0].amount).toBe(189)
+    const empty = runMinisterTool('list_expenses', {}, s, now).result as unknown[]
+    expect(empty).toHaveLength(0)
   })
 })

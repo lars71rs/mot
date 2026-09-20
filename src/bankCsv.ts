@@ -76,13 +76,15 @@ function findCol(headers: string[], keys: string[]): number {
 export function parseNokAmount(raw: string): number | null {
   const t = raw.replace(/\s/g, '').replace(/kr/gi, '')
   if (!t) return null
-  const neg = t.startsWith('-') || t.startsWith('−')
-  const unsigned = t.replace(/^[-−]/, '')
+  const neg = t.startsWith('-') || t.startsWith('−') || t.endsWith('-') || t.endsWith('−')
+  const unsigned = t.replace(/^[-−]/, '').replace(/[-−]$/, '')
   let n: number
   if (unsigned.includes(',') && unsigned.includes('.')) {
     n = Number(unsigned.replace(/\./g, '').replace(',', '.'))
   } else if (unsigned.includes(',')) {
-    n = Number(unsigned.replace(',', '.'))
+    n = Number(unsigned.replace(/\./g, '').replace(',', '.'))
+  } else if (/^\d{1,3}(?:\.\d{3})+$/.test(unsigned)) {
+    n = Number(unsigned.replace(/\./g, ''))
   } else {
     n = Number(unsigned)
   }
@@ -117,6 +119,11 @@ export function parseBankDate(raw: string): string | null {
 export function guessCategory(text: string): ExpenseCategory | null {
   const t = text.toLowerCase()
   if (
+    /husleie|leie\b|depositum|kommunale|strøm|strom|fjernvarme|hafslund|elvia|fyring|bolig/.test(t)
+  ) {
+    return 'bolig'
+  }
+  if (
     /rema|kiwi|coop|meny|spar |bunnpris|matkroken|joker|extra|ica |holdbart|oda /.test(t)
   ) {
     return 'mat'
@@ -129,14 +136,120 @@ export function guessCategory(text: string): ExpenseCategory | null {
     return 'transport'
   }
   if (/h&m|zara|cubus|dressmann|bikbok|ginatricot|kappahl|weekday/.test(t)) return 'klaer'
+  if (/apotek|lege|tannlege|fysio|boots|vitus|helse/.test(t)) return 'helse'
   if (
-    /vinmonopolet|starbucks|espresso|mcdonald|burger|kafé|kafe|barista|utested|night|polet|spotify|netflix|hbo|iskrem|\bis\b|kiosk/.test(
+    /spotify|netflix|hbo|viaplay|telenor|telia|\bice\b|talkmore|abonnement|tv 2 play|disney\+/.test(
+      t,
+    )
+  ) {
+    return 'abonnement'
+  }
+  if (
+    /vinmonopolet|starbucks|espresso|mcdonald|burger|kafé|kafe|barista|utested|night|polet|iskrem|\bis\b|kiosk|kino|restaurant/.test(
       t,
     )
   ) {
     return 'fritid'
   }
   return null
+}
+
+const IN_HINT =
+  /lønn|\blonn\b|salary|innbetaling|innskudd|refusjon|tilbake|overføring fra|overforing fra|from |vipps fra|utbetaling fra|oppdrag|freelance|honorar/i
+const SKIP_LINE =
+  /kontonr|kontonummer|iban|bic\b|side\s+\d|kontoutskrift|org\.?\s*nr|fødsels|periode:|saldo fra|inngående saldo|utgående saldo$/i
+
+function parseStatementLine(line: string): BankRow | null {
+  const trimmed = line.replace(/\s+/g, ' ').trim()
+  if (trimmed.length < 8 || SKIP_LINE.test(trimmed)) return null
+  const dateHit = trimmed.match(/(\d{1,2}\.\d{1,2}\.\d{2,4})/)
+  if (!dateHit || dateHit.index === undefined) return null
+  const date = parseBankDate(dateHit[1])
+  if (!date) return null
+  const afterDate = trimmed
+    .slice(dateHit.index + dateHit[0].length)
+    .replace(/^\s*\d{1,2}\.\d{1,2}\.\d{2,4}\s*/, '')
+  const amountRe = /-?\s*\d{1,3}(?:[.\s]\d{3})*,\d{2}-?|-?\s*\d+,\d{2}-?/g
+  const amounts: { raw: string; value: number; index: number }[] = []
+  let am: RegExpExecArray | null
+  while ((am = amountRe.exec(afterDate)) !== null) {
+    const value = parseNokAmount(am[0])
+    if (value === null || value === 0) continue
+    amounts.push({ raw: am[0], value, index: am.index })
+  }
+  if (amounts.length === 0) return null
+  const tx = amounts[0]
+  const text =
+    afterDate
+      .slice(0, tx.index)
+      .replace(/\s+/g, ' ')
+      .replace(/\bsaldo\b.*$/i, '')
+      .trim() || 'Utgift'
+  let direction: 'out' | 'in'
+  if (tx.value < 0 || /-$/.test(tx.raw.replace(/\s/g, ''))) direction = 'out'
+  else if (IN_HINT.test(text)) direction = 'in'
+  else direction = 'out'
+  return { date, amount: Math.abs(tx.value), text, direction }
+}
+
+export function parseBankText(text: string): ParseResult {
+  const rows: BankRow[] = []
+  let skipped = 0
+  const seen = new Set<string>()
+  const lines = text
+    .split(/\n/)
+    .map((l) => l.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+
+  let i = 0
+  while (i < lines.length) {
+    let joined = lines[i]
+    let row = parseStatementLine(joined)
+    let used = 1
+    if (!row && /\d{1,2}\.\d{1,2}\.\d{2,4}/.test(joined)) {
+      for (let extra = 1; extra <= 4 && i + extra < lines.length; extra++) {
+        const next = lines[i + extra]
+        if (extra > 1 && /^\d{1,2}\.\d{1,2}\.\d{2,4}/.test(next)) break
+        joined = `${joined} ${next}`
+        row = parseStatementLine(joined)
+        used = extra + 1
+        if (row) break
+      }
+    }
+    if (!row) {
+      if (/\d{1,2}\.\d{1,2}\.\d{2,4}/.test(lines[i]) && /,/.test(lines[i])) skipped++
+      i += 1
+      continue
+    }
+    const key = `${row.date}|${row.amount}|${row.text.slice(0, 40)}|${row.direction}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      rows.push(row)
+    }
+    i += used
+  }
+  if (rows.length === 0) {
+    return { rows: [], skipped, error: 'Fant ingen transaksjoner i teksten.' }
+  }
+  return { rows, skipped, error: null }
+}
+
+function looksLikeCsv(raw: string): boolean {
+  const first = (raw.trim().split('\n', 1)[0] || '').toLowerCase()
+  if (!first.includes(';') && !first.includes(',')) return false
+  return DATE_KEYS.some((k) => first.includes(k))
+}
+
+export function parseBankStatement(raw: string): ParseResult {
+  const csv = parseBankCsv(raw)
+  const text = parseBankText(raw)
+  if (!csv.error && csv.rows.length > 0 && csv.rows.length >= text.rows.length) return csv
+  if (text.rows.length > 0) return text
+  if (!csv.error && csv.rows.length > 0) return csv
+  if (looksLikeCsv(raw) && csv.error) return csv
+  return text.error
+    ? text
+    : { rows: [], skipped: text.skipped, error: 'Fant ingen transaksjoner i teksten.' }
 }
 
 export function parseBankCsv(raw: string): ParseResult {

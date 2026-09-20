@@ -1,11 +1,18 @@
 services:
   - type: web
     name: mot
-    runtime: docker
+    runtime: node
     plan: free
+    region: frankfurt
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
+        value: "1"
       - key: XAI_API_KEY
         sync: false

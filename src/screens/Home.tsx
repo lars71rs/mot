@@ -1,91 +1,255 @@
-import { inPocket, spentByCategory, spentThisMonth, spentThisWeek } from '../map'
-import { type ExpenseCategory } from '../types'
-import { formatNok, formatNokPlain, formatShortDate, monthName } from '../format'
+import { useMemo, useState } from 'react'
+import { formatNok, formatNokPlain, formatShortDate, monthTitleFromKey } from '../format'
+import {
+  dateFromMonthKey,
+  incomeThisMonth,
+  leftoverThisMonth,
+  monthExpenses,
+  monthKey,
+  monthsWithActivity,
+  spentByCategory,
+  spentThisMonth,
+  visibleMonths,
+} from '../map'
 import { useStore } from '../store'
+import { categoryLabel, type ExpenseCategory } from '../types'
+
+const DONUT = ['#1e4a3a', '#2f6b54', '#4d8f72', '#8f3d24', '#c4a574', '#5e584f', '#16382c', '#a67c52']
 
 export function Home({
   onAdd,
   onCategory,
 }: {
   onAdd: () => void
-  onCategory: (category: ExpenseCategory | null) => void
+  onCategory: (category: ExpenseCategory | null, month: string) => void
 }) {
-  const { state } = useStore()
+  const { state, setSavingsGoal } = useStore()
   const now = new Date()
-  const spentMonth = spentThisMonth(state.expenses, now)
-  const spentWeek = spentThisWeek(state.expenses, now)
-  const fixedTotal = state.fixed.reduce((s, f) => s + f.amount, 0)
-  const pocket = inPocket(state.monthlyIncome, fixedTotal, spentMonth)
-  const categories = spentByCategory(state.expenses, now)
-  const month = monthName(now)
+  const activity = monthsWithActivity(state.expenses)
+  const allowed = visibleMonths(state.expenses, now)
+  const fallbackKey = activity[0] ?? monthKey(now)
+  const [viewKey, setViewKey] = useState(fallbackKey)
+  const [txFilter, setTxFilter] = useState<'all' | 'in' | 'out'>('all')
+  const [editGoal, setEditGoal] = useState(false)
+  const [goalName, setGoalName] = useState('')
+  const [goalAmount, setGoalAmount] = useState('')
+  const monthKeyShown = allowed.includes(viewKey) ? viewKey : fallbackKey
+  const monthIndex = allowed.indexOf(monthKeyShown)
+  const prevMonth = monthIndex > 0 ? allowed[monthIndex - 1] : null
+  const nextMonth = monthIndex >= 0 && monthIndex < allowed.length - 1 ? allowed[monthIndex + 1] : null
+
+  const view = dateFromMonthKey(monthKeyShown)
+  const income = incomeThisMonth(state.expenses, view)
+  const spent = spentThisMonth(state.expenses, view)
+  const leftover = leftoverThisMonth(state.expenses, view)
+  const categories = spentByCategory(state.expenses, view)
+  const txs = monthExpenses(state.expenses, view)
+  const shown = txs.filter((e) => {
+    if (txFilter === 'in') return e.direction === 'in'
+    if (txFilter === 'out') return e.direction !== 'in'
+    return true
+  })
+  const goal = state.goals.find((g) => g.active) ?? null
+  const usedSavings = leftover < 0 ? -leftover : 0
+  const saved = leftover > 0 ? leftover : 0
+
+  const donut = useMemo(() => {
+    if (spent <= 0 || categories.length === 0) return 'var(--paper-2)'
+    let cursor = 0
+    const parts: string[] = []
+    categories.forEach((row, i) => {
+      const next = cursor + (row.amount / spent) * 100
+      parts.push(`${DONUT[i % DONUT.length]} ${cursor}% ${next}%`)
+      cursor = next
+    })
+    return `conic-gradient(${parts.join(', ')})`
+  }, [categories, spent])
+
+  function saveGoal() {
+    const amount = Math.round(Number(goalAmount.replace(/\s/g, '').replace(',', '.')))
+    if (!amount || amount <= 0) return
+    setSavingsGoal(goalName.trim() || 'Sparing', amount)
+    setEditGoal(false)
+  }
 
   return (
-    <main className="screen home">
-      <header className="home-top">
-        <p className="kicker">Oversikt</p>
-        <p className="date">{formatShortDate(now)}</p>
-      </header>
-
-      <div className="home-board">
-        <section className="hero">
-          <p className="kicker">Brukt i {month}</p>
-          <p className="hero-number">
-            {formatNokPlain(spentMonth)}
-            <span> kr</span>
-          </p>
-          <p className="hero-sub">Denne uka {formatNok(spentWeek)}</p>
-        </section>
-
-        <div className="home-facts">
-          <dl className="meta">
-            <div>
-              <dt>Inntekt</dt>
-              <dd>{formatNok(state.monthlyIncome)}</dd>
-            </div>
-            <div>
-              <dt>Faste</dt>
-              <dd>{formatNok(fixedTotal)}</dd>
-            </div>
-            <div>
-              <dt>Forbruk</dt>
-              <dd>{formatNok(spentMonth)}</dd>
-            </div>
-            <div className={pocket < 0 ? 'pocket-over' : ''}>
-              <dt>I lomma</dt>
-              <dd>{formatNok(pocket)}</dd>
-            </div>
-          </dl>
-        </div>
-      </div>
-
-      <section className="today-list">
-        <div className="today-head">
-          <h2>Hvor det gikk</h2>
-          <button type="button" className="btn-primary btn-small" onClick={onAdd}>
-            Legg inn utgift
+    <main className="screen kart">
+      <header className="kart-top">
+        <div className="kart-month">
+          <button
+            type="button"
+            className="kart-nav"
+            disabled={!prevMonth}
+            onClick={() => prevMonth && setViewKey(prevMonth)}
+          >
+            ‹
+          </button>
+          <h1>{monthTitleFromKey(monthKeyShown)}</h1>
+          <button
+            type="button"
+            className="kart-nav"
+            disabled={!nextMonth}
+            onClick={() => nextMonth && setViewKey(nextMonth)}
+          >
+            ›
           </button>
         </div>
-        {categories.length === 0 ? (
-          <p className="empty">Ingen utgifter registrert i {month}.</p>
-        ) : (
-          <ul className="rows">
-            {categories.map((row) => (
-              <li key={row.key}>
+        <button type="button" className="btn-primary btn-small" onClick={onAdd}>
+          + Ny
+        </button>
+      </header>
+
+      <div className="kart-grid">
+        <div className="kart-left">
+          <section className="kart-card">
+            <p className="kicker">Du har igjen · {monthTitleFromKey(monthKeyShown)}</p>
+            <p className={`kart-hero ${leftover < 0 ? 'is-over' : ''}`}>
+              {formatNokPlain(leftover)}
+              <span> kr</span>
+            </p>
+          </section>
+
+          <div className="kart-stats">
+            <section className="kart-card">
+              <p className="kicker">Inntekter</p>
+              <p className="kart-stat is-in">{formatNok(income)}</p>
+            </section>
+            <section className="kart-card">
+              <p className="kicker">Utgifter</p>
+              <p className="kart-stat is-out">{formatNok(spent)}</p>
+            </section>
+            <section className="kart-card kart-save">
+              <p className="kicker">Sparing</p>
+              {editGoal ? (
+                <div className="kart-goal-edit">
+                  <input
+                    className="text-input"
+                    placeholder="Navn på målet"
+                    value={goalName}
+                    onChange={(e) => setGoalName(e.target.value)}
+                  />
+                  <input
+                    className="text-input"
+                    inputMode="numeric"
+                    placeholder="Beløp"
+                    value={goalAmount}
+                    onChange={(e) => setGoalAmount(e.target.value)}
+                  />
+                  <button type="button" className="btn-primary btn-small" onClick={saveGoal}>
+                    Lagre mål
+                  </button>
+                </div>
+              ) : goal ? (
                 <button
                   type="button"
-                  className="row row-btn"
-                  onClick={() => onCategory(row.category)}
+                  className="kart-save-btn"
+                  onClick={() => {
+                    setGoalName(goal.name)
+                    setGoalAmount(String(goal.targetAmount))
+                    setEditGoal(true)
+                  }}
                 >
-                  <span>
-                    <strong>{row.label}</strong>
-                  </span>
-                  <em>{formatNok(row.amount)}</em>
+                  <p className="kart-stat">{formatNok(goal.targetAmount)}</p>
+                  <p className="hint">{goal.name}</p>
+                  {usedSavings > 0 ? (
+                    <p className="kart-used">Brukt {formatNok(usedSavings)} av sparingen</p>
+                  ) : (
+                    <p className="hint">Spart {formatNok(saved)} denne måneden</p>
+                  )}
                 </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+              ) : (
+                <button
+                  type="button"
+                  className="kart-save-btn"
+                  onClick={() => {
+                    setGoalName('')
+                    setGoalAmount('')
+                    setEditGoal(true)
+                  }}
+                >
+                  <p className="kart-stat">Sett et mål</p>
+                  {usedSavings > 0 ? (
+                    <p className="kart-used">Brukt {formatNok(usedSavings)} av sparingen</p>
+                  ) : saved > 0 ? (
+                    <p className="hint">Spart {formatNok(saved)} denne måneden</p>
+                  ) : (
+                    <p className="hint">Ett beløp. Minus vises som brukt av sparingen.</p>
+                  )}
+                </button>
+              )}
+            </section>
+          </div>
+
+          <section className="kart-card">
+            <p className="kicker">Utgifter etter kategori</p>
+            <p className="hint">Fordeling {monthTitleFromKey(monthKeyShown).toLowerCase()}</p>
+            {categories.length === 0 ? (
+              <p className="empty">Ingen utgifter denne måneden.</p>
+            ) : (
+              <div className="kart-cats">
+                <div className="kart-donut" style={{ background: donut }} aria-hidden>
+                  <span>
+                    {formatNokPlain(spent)}
+                    <em>kr</em>
+                  </span>
+                </div>
+                <ul className="kart-bars">
+                  {categories.map((row, i) => (
+                    <li key={row.key}>
+                      <button type="button" onClick={() => onCategory(row.category, monthKeyShown)}>
+                        <span>
+                          <i style={{ background: DONUT[i % DONUT.length] }} />
+                          {row.label}
+                        </span>
+                        <strong>{formatNok(row.amount)}</strong>
+                      </button>
+                      <b style={{ width: `${spent ? (row.amount / spent) * 100 : 0}%` }} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        </div>
+
+        <section className="kart-card kart-txs">
+          <div className="kart-tx-head">
+            <h2>Transaksjoner</h2>
+            <div className="kart-filters">
+              {(['all', 'in', 'out'] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  className={txFilter === f ? 'on' : ''}
+                  onClick={() => setTxFilter(f)}
+                >
+                  {f === 'all' ? 'Alle' : f === 'in' ? 'Inntekt' : 'Utgift'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {shown.length === 0 ? (
+            <p className="empty">Ingen poster. Dump forrige måneds utskrift hos finansministeren.</p>
+          ) : (
+            <ul className="kart-tx-list">
+              {shown.map((e) => (
+                <li key={e.id}>
+                  <span>
+                    <strong>{e.note?.trim() || (e.direction === 'in' ? 'Inn' : 'Utgift')}</strong>
+                    <em>
+                      {e.direction === 'in' ? 'Inntekt' : categoryLabel(e.category)} ·{' '}
+                      {formatShortDate(new Date(`${e.date}T12:00:00`))}
+                    </em>
+                  </span>
+                  <b className={e.direction === 'in' ? 'is-in' : 'is-out'}>
+                    {e.direction === 'in' ? '+' : '−'} {formatNokPlain(e.amount)} kr
+                  </b>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
     </main>
   )
 }

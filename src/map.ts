@@ -8,8 +8,23 @@ export type CategorySpend = {
   amount: number
 }
 
+export function monthKey(now: Date): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
 export function monthPrefix(now: Date): string {
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-`
+  return `${monthKey(now)}-`
+}
+
+export function dateFromMonthKey(key: string): Date {
+  const [y, m] = key.split('-').map(Number)
+  return new Date(y, (m || 1) - 1, 1, 12, 0, 0)
+}
+
+export function shiftMonthKey(key: string, delta: number): string {
+  const d = dateFromMonthKey(key)
+  d.setMonth(d.getMonth() + delta)
+  return monthKey(d)
 }
 
 export function startOfIsoWeek(now: Date): Date {
@@ -22,8 +37,75 @@ export function inMonth(isoDate: string, now: Date): boolean {
   return isoDate.startsWith(monthPrefix(now))
 }
 
-export function spentThisMonth(expenses: Pick<Expense, 'amount' | 'date'>[], now: Date): number {
-  return expenses.filter((e) => inMonth(e.date, now)).reduce((s, e) => s + e.amount, 0)
+export function isOut(e: Pick<Expense, 'direction'>): boolean {
+  return e.direction !== 'in'
+}
+
+export function isIn(e: Pick<Expense, 'direction'>): boolean {
+  return e.direction === 'in'
+}
+
+export function spentThisMonth(
+  expenses: Pick<Expense, 'amount' | 'date' | 'direction'>[],
+  now: Date,
+): number {
+  return expenses.filter((e) => inMonth(e.date, now) && isOut(e)).reduce((s, e) => s + e.amount, 0)
+}
+
+export function incomeThisMonth(
+  expenses: Pick<Expense, 'amount' | 'date' | 'direction'>[],
+  now: Date,
+): number {
+  return expenses.filter((e) => inMonth(e.date, now) && isIn(e)).reduce((s, e) => s + e.amount, 0)
+}
+
+export function leftoverThisMonth(
+  expenses: Pick<Expense, 'amount' | 'date' | 'direction'>[],
+  now: Date,
+): number {
+  return incomeThisMonth(expenses, now) - spentThisMonth(expenses, now)
+}
+
+export function spentByMonth(
+  expenses: Pick<Expense, 'amount' | 'date' | 'direction'>[],
+): { month: string; amount: number }[] {
+  const totals = new Map<string, number>()
+  for (const e of expenses) {
+    if (!isOut(e)) continue
+    const key = e.date.slice(0, 7)
+    if (!/^\d{4}-\d{2}$/.test(key)) continue
+    totals.set(key, (totals.get(key) ?? 0) + e.amount)
+  }
+  return [...totals.entries()]
+    .map(([month, amount]) => ({ month, amount }))
+    .sort((a, b) => b.month.localeCompare(a.month))
+}
+
+export function monthsWithActivity(expenses: Pick<Expense, 'date'>[]): string[] {
+  const keys = new Set<string>()
+  for (const e of expenses) {
+    const key = e.date.slice(0, 7)
+    if (/^\d{4}-\d{2}$/.test(key)) keys.add(key)
+  }
+  return [...keys].sort((a, b) => b.localeCompare(a))
+}
+
+export function visibleMonths(expenses: Pick<Expense, 'date'>[], now: Date): string[] {
+  const activity = monthsWithActivity(expenses)
+  const current = monthKey(now)
+  const first = activity.length ? activity[activity.length - 1] : current
+  const newest = activity[0] ?? current
+  const last = newest > current ? newest : current
+  const start = first < last ? first : last
+  const end = first < last ? last : first
+  const out: string[] = []
+  let key = start
+  while (key <= end) {
+    out.push(key)
+    key = shiftMonthKey(key, 1)
+    if (out.length > 120) break
+  }
+  return out
 }
 
 export function inPocket(
@@ -34,11 +116,11 @@ export function inPocket(
   return monthlyIncome - fixedTotal - spentMonth
 }
 
-export function spentThisWeek(expenses: Pick<Expense, 'amount' | 'date'>[], now: Date): number {
+export function spentThisWeek(expenses: Pick<Expense, 'amount' | 'date' | 'direction'>[], now: Date): number {
   const from = toISODate(startOfIsoWeek(now))
   const to = toISODate(now)
   return expenses
-    .filter((e) => e.date >= from && e.date <= to)
+    .filter((e) => isOut(e) && e.date >= from && e.date <= to)
     .reduce((s, e) => s + e.amount, 0)
 }
 
@@ -49,12 +131,12 @@ export function monthExpenses(expenses: Expense[], now: Date): Expense[] {
 }
 
 export function spentByCategory(
-  expenses: Pick<Expense, 'amount' | 'date' | 'category'>[],
+  expenses: Pick<Expense, 'amount' | 'date' | 'category' | 'direction'>[],
   now: Date,
 ): CategorySpend[] {
   const totals = new Map<string, number>()
   for (const e of expenses) {
-    if (!inMonth(e.date, now)) continue
+    if (!inMonth(e.date, now) || !isOut(e)) continue
     const key = e.category ?? 'ukjent'
     totals.set(key, (totals.get(key) ?? 0) + e.amount)
   }
@@ -76,7 +158,8 @@ export function expensesForCategory(
   category: ExpenseCategory | null,
   now: Date,
 ): Expense[] {
-  return monthExpenses(expenses, now).filter((e) =>
-    category === null ? e.category === null : e.category === category,
+  return monthExpenses(expenses, now).filter(
+    (e) =>
+      isOut(e) && (category === null ? e.category === null : e.category === category),
   )
 }

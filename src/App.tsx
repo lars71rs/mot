@@ -2,21 +2,20 @@ import { useEffect, useState } from 'react'
 import { AppShell } from './components/AppShell'
 import { AddExpense } from './screens/AddExpense'
 import { CategoryMonth } from './screens/CategoryMonth'
-import { FixedExpenses } from './screens/FixedExpenses'
 import { Home } from './screens/Home'
-import { ImportBank } from './screens/ImportBank'
 import { Meet } from './screens/Meet'
-import { Income } from './screens/Income'
+import { Profile } from './screens/Profile'
 import { Settings } from './screens/Settings'
 import { Welcome } from './screens/Welcome'
 import { useStore } from './store'
 import type { Route } from './types'
 
 export default function App() {
-  const { state, loadDemo } = useStore()
-  const [route, setRoute] = useState<Route>(() =>
-    state.onboarded ? { name: 'meet' } : { name: 'welcome' },
-  )
+  const { state, loadDemo, completeOnboarding } = useStore()
+  const [route, setRoute] = useState<Route>(() => {
+    if (!state.onboarded) return { name: 'welcome' }
+    return state.expenses.length > 0 ? { name: 'home' } : { name: 'meet' }
+  })
   const [demoTried, setDemoTried] = useState(false)
 
   useEffect(() => {
@@ -25,33 +24,23 @@ export default function App() {
     if (params.get('demo') !== '1') return
     setDemoTried(true)
     loadDemo()
-    setRoute({ name: 'meet' })
+    setRoute({ name: 'home' })
   }, [demoTried, loadDemo])
 
   const goMeet = () => setRoute({ name: 'meet' })
   const goHome = () => setRoute({ name: 'home' })
   const goAdd = () => setRoute({ name: 'add-expense' })
-  const goImport = () => setRoute({ name: 'import' })
   const goSettings = () => setRoute({ name: 'settings' })
 
   if (!state.onboarded) {
-    if (route.name === 'income') {
+    if (route.name === 'profile') {
       return (
         <div className="gate">
-          <Income
-            fromOnboarding
-            onNext={() => setRoute({ name: 'fixed', fromOnboarding: true })}
-          />
-        </div>
-      )
-    }
-    if (route.name === 'fixed') {
-      return (
-        <div className="gate">
-          <FixedExpenses
-            fromOnboarding
-            onBack={() => setRoute({ name: 'income', fromOnboarding: true })}
-            onNext={goMeet}
+          <Profile
+            onNext={(name, birthYear) => {
+              completeOnboarding(name, birthYear)
+              goMeet()
+            }}
           />
         </div>
       )
@@ -59,83 +48,47 @@ export default function App() {
     return (
       <div className="gate">
         <Welcome
-          onStart={() => setRoute({ name: 'income', fromOnboarding: true })}
+          onStart={() => setRoute({ name: 'profile' })}
           onDemo={() => {
             loadDemo()
-            goMeet()
+            goHome()
           }}
         />
       </div>
     )
   }
 
-  let active: 'meet' | 'home' | 'add' | 'import' | 'settings' = 'meet'
-  if (route.name === 'home' || route.name === 'category') active = 'home'
-  if (route.name === 'add-expense') active = 'add'
-  if (route.name === 'import') active = 'import'
-  if (route.name === 'settings' || route.name === 'income' || route.name === 'fixed') {
-    active = 'settings'
-  }
+  let active: 'meet' | 'home' | 'settings' = 'home'
+  if (route.name === 'meet') active = 'meet'
+  if (route.name === 'settings') active = 'settings'
 
   let body
   switch (route.name) {
-    case 'income':
-      body = (
-        <Income
-          fromOnboarding={false}
-          onBack={goSettings}
-          onNext={goSettings}
-        />
-      )
-      break
-    case 'fixed':
-      body = (
-        <FixedExpenses
-          fromOnboarding={false}
-          onBack={goSettings}
-          onNext={goSettings}
-        />
-      )
-      break
     case 'add-expense':
-      body = <AddExpense onBack={goMeet} onDone={goMeet} />
-      break
-    case 'import':
-      body = <ImportBank onDone={goMeet} />
+      body = <AddExpense onBack={goHome} onDone={goHome} />
       break
     case 'meet':
-      body = <Meet />
+      body = <Meet onMap={goHome} />
       break
     case 'category':
-      body = <CategoryMonth category={route.category} onBack={goHome} />
+      body = (
+        <CategoryMonth category={route.category} month={route.month} onBack={goHome} />
+      )
       break
     case 'settings':
-      body = (
-        <Settings
-          onIncome={() => setRoute({ name: 'income', fromOnboarding: false })}
-          onFixed={() => setRoute({ name: 'fixed', fromOnboarding: false })}
-          onReset={goMeet}
-        />
-      )
+      body = <Settings onReset={goMeet} />
       break
     default:
       body = (
         <Home
           onAdd={goAdd}
-          onCategory={(category) => setRoute({ name: 'category', category })}
+          onCategory={(category, month) => setRoute({ name: 'category', category, month })}
         />
       )
   }
 
   return (
-    <AppShell
-      active={active}
-      onMeet={goMeet}
-      onHome={goHome}
-      onAdd={goAdd}
-      onImport={goImport}
-      onSettings={goSettings}
-    >
+    <AppShell active={active} onMeet={goMeet} onHome={goHome} onSettings={goSettings}>
       {body}
     </AppShell>
   )

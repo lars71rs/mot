@@ -108,6 +108,10 @@ h1 {
   max-width: 920px;
 }
 
+.desk-main .kart {
+  max-width: 1180px;
+}
+
 .desk-main-meet {
   overflow: hidden;
   display: flex;
@@ -121,7 +125,7 @@ h1 {
 
 .meet {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 28px;
   flex: 1;
   min-height: 0;
@@ -212,6 +216,32 @@ h1 {
   font-size: 1rem;
   color: var(--muted);
   letter-spacing: 0;
+}
+
+.meet-months {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.meet-months li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.meet-months .on {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.meet-chat.dropzone-on {
+  outline: 1px dashed var(--ink);
+  outline-offset: -4px;
+  background: var(--paper-2);
 }
 
 .desk-main .stack .btn-primary,
@@ -865,6 +895,10 @@ h1 {
   margin: 0 0 1rem;
 }
 
+.hint a {
+  color: var(--forest);
+}
+
 .check {
   display: flex;
   gap: 10px;
@@ -903,4 +937,300 @@ h1 {
 
 .empty {
   margin-bottom: 1rem;
+}
+
+.manual {
+  margin: 0 0 1.8rem;
+  padding: 0 0 0 1.15rem;
+  color: var(--muted);
+}
+
+.manual li {
+  margin: 0 0 0.85rem;
+}
+
+.manual strong {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.kart-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 1.4rem;
+}
+
+.kart-month {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.kart-month h1 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+.kart-nav {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.kart-nav:disabled {
+  opacity: 0.28;
+  cursor: not-allowed;
+}
+
+.kart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.9fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.kart-left {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.kart-card {
+  background: #faf6ef;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px 20px;
+}
+
+.kart-card .kicker {
+  margin-bottom: 0.2rem;
+}
+
+.kart-card .hint,
+.kart-card .empty {
+  margin: 0.2rem 0 0;
+}
+
+.kart-hero {
+  font-family: Fraunces, Georgia, serif;
+  font-size: 2.6rem;
+  font-weight: 560;
+  letter-spacing: -0.04em;
+  margin: 0.2rem 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.kart-hero span,
+.kart-stat span {
+  font-size: 1rem;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+
+.kart-hero.is-over,
+.kart-used,
+.is-out {
+  color: var(--rust);
+}
+
+.is-in {
+  color: var(--forest);
+}
+
+.kart-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.15fr;
+  gap: 12px;
+}
+
+.kart-stat {
+  font-family: Fraunces, Georgia, serif;
+  font-size: 1.45rem;
+  font-weight: 560;
+  margin: 0.15rem 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.kart-save-btn {
+  display: block;
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.kart-goal-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.kart-cats {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 20px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.kart-donut {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.kart-donut span {
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  background: #faf6ef;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-family: Fraunces, Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 560;
+  line-height: 1.1;
+}
+
+.kart-donut em {
+  display: block;
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-family: Figtree, sans-serif;
+}
+
+.kart-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kart-bars li {
+  margin: 0 0 10px;
+}
+
+.kart-bars button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  background: none;
+  border: 0;
+  padding: 0 0 4px;
+  text-align: left;
+}
+
+.kart-bars button span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kart-bars i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.kart-bars b {
+  display: block;
+  height: 4px;
+  background: var(--forest);
+  border-radius: 2px;
+  max-width: 100%;
+}
+
+.kart-tx-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.kart-tx-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.kart-filters {
+  display: flex;
+  gap: 4px;
+  background: var(--paper-2);
+  padding: 3px;
+  border-radius: 999px;
+}
+
+.kart-filters button {
+  background: none;
+  border: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.kart-filters button.on {
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.kart-tx-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kart-tx-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.kart-tx-list span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kart-tx-list em {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.kart-tx-list b {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.field-label {
+  display: block;
+  margin: 1rem 0 0.2rem;
+}
+
+@media (max-width: 980px) {
+  .kart-grid,
+  .kart-stats,
+  .kart-cats {
+    grid-template-columns: 1fr;
+  }
 }

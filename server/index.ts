@@ -7,7 +7,9 @@ import {
   ingestSpendUtterance,
   runMinisterTool,
 } from '../src/ministerTools.ts'
+import { parseBankStatement } from '../src/bankCsv.ts'
 import type { AppState } from '../src/types.ts'
+import { pdfBufferToText } from './pdfExtract.ts'
 
 function loadEnv() {
   const p = resolve(process.cwd(), '.env')
@@ -47,17 +49,21 @@ const MIME: Record<string, string> = {
 }
 
 const SYSTEM = `Du er finansministeren i Mot — en app for unge voksne i Norge.
-Jobben din: kartlegge hvor pengene faktisk går, og hjelpe dem å se vaner og uvaner.
+Jobben din: kartlegge økonomien fra bankutskriften og hjelpe dem å få kontroll.
 
 Regler:
 - Tone: konkret, uten skam. Ingen dagsgrense, ingen moralpreken, ingen emoji-regn.
-- Tall i hele kroner. Norsk.
-- Du har verktøy som styrer tavlen. Bruk dem. Ikke late som du har sett kontoen uten fil eller logg.
-- Inn på konto (lønn) er ikke forbruk. Ikke sett lønn som vanlig månedsinntekt uten at brukeren sier at det er den faste inntekten.
-- Når en bankfil kommer: les utgående, si hva du ser (største poster, mønster, hva som ser fast ut vs impuls), og hva som er grep om de vil.
-- Når brukeren sier at de har brukt penger: kall add_expense for HVER post i DENNE runden. Uten det kallet er ingenting lagt inn. Si aldri at du har lagt inn uten at verktøyet er kjørt.
+- Tall i hele kroner. Norsk. Bruk navnet deres hvis du har det.
+- Første steg er å få forrige kalendermåneds kontoutskrift (PDF eller CSV). Be om den. Ikke be dem taste inn inntekt og faste.
+- PDF og CSV leses FØR du svarer. Se import-resultatet. Si aldri at du ikke kan lese PDF hvis importen kjørte.
+- Inn og ut fra filen ligger på kartet. leftover = inntekt minus utgifter for den måneden. Positiv leftover er spart. Negativ leftover er brukt av sparingen.
+- Snakk om måneden i byMonth / board.month, ikke anta at spent er «i dag».
+- Etter dump: si hva du ser, og FORELSÅ hva som ser fast ut (husleie, mobil, lån, abonnement). Ikke kall add_fixed før de sier ja.
+- Sparemål: ett mål. Sett det med set_savings_goal bare hvis de ber om det.
+- Hvis importen fant 0 rader, får du råtekst. Lag CSV (Dato;Forklaring;Ut av konto;Inn på konto) og kall import_bank_csv.
+- En filsti er ikke filinnhold. Be dem bruke Fil eller slippe PDF-en på chatten.
+- Når de sier at de har brukt penger: kall add_expense for hver post. Si aldri at du har lagt inn uten at verktøyet er kjørt.
 - Dato er valgfri; utelat den så brukes i dag.
-- Kall get_board bare når du trenger oppdatert oversikt, ikke før hver add_expense.
 - Kort. Pek på tre ting, ikke tretti.`
 
 const client = new OpenAI({
@@ -75,6 +81,14 @@ function json(res: import('node:http').ServerResponse, status: number, body: unk
     'Access-Control-Allow-Headers': 'Content-Type',
   })
   res.end(data)
+}
+
+function stripDataUrl(raw?: string): string {
+  const s = raw?.trim() || ''
+  if (!s) return ''
+  const i = s.indexOf(',')
+  if (s.startsWith('data:') && i >= 0) return s.slice(i + 1)
+  return s
 }
 
 function parseNow(raw?: string): Date {
@@ -147,6 +161,7 @@ async function runMinister(body: {
   messages: { role: 'user' | 'assistant'; content: string }[]
   snapshot: AppState
   csv?: string
+  pdfBase64?: string
   now?: string
 }) {
   if (!process.env.XAI_API_KEY) {
@@ -155,9 +170,31 @@ async function runMinister(body: {
   let state = body.snapshot
   const now = parseNow(body.now)
   const actions: string[] = []
+  let statementText = body.csv?.trim() || ''
+  const pdfB64 = stripDataUrl(body.pdfBase64)
+  if (pdfB64) {
+    const buf = Buffer.from(pdfB64, 'base64')
+    statementText = (await pdfBufferToText(buf)).trim()
+    console.log(`minister-pdf bytes=${buf.length} chars=${statementText.length}`)
+    if (!statementText) {
+      throw new Error(
+        'PDF-en inneholder ikke lesbar tekst. Skannede bilder uten tekstlag støttes ikke ennå.',
+      )
+    }
+  }
+
+  let importResult: unknown = null
+  if (statementText) {
+    const imported = runMinisterTool('import_bank_csv', { csv: statementText }, state, now)
+    state = imported.state
+    importResult = imported.result
+    actions.push('import_bank_csv')
+    const info = importResult as { added?: number; error?: string }
+    console.log(`minister-import added=${info.added ?? 0} error=${info.error ?? '-'}`)
+  }
 
   const lastUser = [...body.messages].reverse().find((m) => m.role === 'user')
-  if (lastUser) {
+  if (lastUser && !statementText) {
     const ingested = ingestSpendUtterance(lastUser.content, state, now)
     if (ingested.added.length > 0) {
       state = ingested.state
@@ -174,21 +211,38 @@ async function runMinister(body: {
     ...body.messages.map((m) => ({ role: m.role, content: m.content })),
   ]
 
-  if (lastUser && actions.includes('add_expense')) {
+  if (statementText) {
+    const info = (importResult ?? {}) as {
+      added?: number
+      error?: string
+      months?: { month: string; amount: number }[]
+      sample?: unknown
+      incomingSkipped?: number
+      duplicates?: number
+    }
+    const added = info.added ?? 0
+    let content = `BANKIMPORT allerede kjørt. Resultat: ${JSON.stringify({
+      added,
+      error: info.error ?? null,
+      duplicates: info.duplicates ?? 0,
+      incomingSkipped: info.incomingSkipped ?? 0,
+      months: info.months ?? [],
+      sample: info.sample ?? [],
+    })}.`
+    if (added > 0) {
+      content +=
+        ' Transaksjonene har datoene fra filen. spentThisMonth er bare inneværende måned — se byMonth. Ikke si at PDF ikke støttes, og ikke importer på nytt.'
+    } else {
+      content +=
+        ' Ingen rader ble plukket automatisk. Her er teksten fra filen. Lag CSV med kolonnene Dato;Forklaring;Ut av konto;Inn på konto og kall import_bank_csv én gang.\n\n'
+      content += statementText.slice(0, 14_000)
+    }
+    input.push({ role: 'user', content })
+  } else if (lastUser && actions.includes('add_expense')) {
     input.push({
       role: 'user',
       content:
         'Utgiftene i siste melding er allerede lagt inn på tavlen. Ikke kall add_expense for dem på nytt. Kommenter det som står der.',
-    })
-  }
-
-  if (body.csv && body.csv.trim()) {
-    const imported = runMinisterTool('import_bank_csv', { csv: body.csv }, state, now)
-    state = imported.state
-    actions.push('import_bank_csv')
-    input.push({
-      role: 'user',
-      content: `Jeg dumpet måneden som bankfil. Importresultat: ${JSON.stringify(imported.result)}. Les tavlen og si hva du ser.`,
     })
   }
 
@@ -198,7 +252,7 @@ async function runMinister(body: {
     tools: MINISTER_TOOLS,
   })
 
-  for (let step = 0; step < 5; step++) {
+  for (let step = 0; step < 8; step++) {
     const calls = extractCalls(response)
     if (calls.length === 0) break
     const outputs: OpenAI.Responses.ResponseInput = []
@@ -252,6 +306,7 @@ const server = createServer(async (req, res) => {
       messages?: { role: 'user' | 'assistant'; content: string }[]
       snapshot?: AppState
       csv?: string
+      pdfBase64?: string
       now?: string
     }
     try {
@@ -269,11 +324,44 @@ const server = createServer(async (req, res) => {
         messages: body.messages,
         snapshot: body.snapshot,
         csv: body.csv,
+        pdfBase64: body.pdfBase64,
         now: body.now,
       })
       json(res, 200, out)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Ukjent feil'
+      json(res, 500, { error: msg })
+    }
+    return
+  }
+
+  if (req.method === 'POST' && url === '/api/parse-bank') {
+    const chunks: Buffer[] = []
+    for await (const c of req) chunks.push(c as Buffer)
+    let body: { text?: string; pdfBase64?: string }
+    try {
+      body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') as typeof body
+    } catch {
+      json(res, 400, { error: 'Ugyldig JSON' })
+      return
+    }
+    try {
+      let text = body.text?.trim() || ''
+      const pdfB64 = stripDataUrl(body.pdfBase64)
+      if (pdfB64) {
+        text = (await pdfBufferToText(Buffer.from(pdfB64, 'base64'))).trim()
+      }
+      if (!text) {
+        json(res, 400, { error: 'Tom fil, eller PDF uten tekstlag.' })
+        return
+      }
+      const parsed = parseBankStatement(text)
+      console.log(
+        `parse-bank chars=${text.length} rows=${parsed.rows.length} error=${parsed.error ?? '-'}`,
+      )
+      json(res, 200, { ...parsed, text: text.slice(0, 80_000) })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Klarte ikke å lese filen'
       json(res, 500, { error: msg })
     }
     return

@@ -82,3 +82,18 @@ export function goalTypeLabel(type: string): string {
 export function monthName(d: Date): string {
   return new Intl.DateTimeFormat('nb-NO', { month: 'long' }).format(d)
 }
+
+export function monthNameFromKey(key: string): string {
+  const [y, m] = key.split('-').map(Number)
+  if (!y || !m) return key
+  return monthName(new Date(y, m - 1, 1))
+}
+
+export function monthTitle(d: Date): string {
+  const name = monthName(d)
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${d.getFullYear()}`
+}
+
+export function monthTitleFromKey(key: string): string {
+  return monthTitle(new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, 1))
+}

@@ -37,14 +37,28 @@ type Store = {
   }) => string
   activateGoal: (id: string | null) => void
   removeGoal: (id: string) => void
-  addExpense: (amount: number, date: string, category: ExpenseCategory | null) => void
+  addExpense: (
+    amount: number,
+    date: string,
+    category: ExpenseCategory | null,
+    direction?: 'in' | 'out',
+    note?: string,
+  ) => void
   importExpenses: (
-    items: { amount: number; date: string; category: ExpenseCategory | null; note: string }[],
+    items: {
+      amount: number
+      date: string
+      category: ExpenseCategory | null
+      note: string
+      direction?: 'in' | 'out'
+    }[],
   ) => { added: number; duplicates: number }
   removeExpense: (id: string) => void
   saveBudgetPlans: (plans: BudgetPlans) => void
   resetBudget: () => void
-  completeOnboarding: () => void
+  setProfile: (name: string, birthYear: number) => void
+  setSavingsGoal: (name: string, targetAmount: number) => void
+  completeOnboarding: (name?: string, birthYear?: number) => void
   loadDemo: () => void
   resetAll: () => void
   replaceState: (next: AppState) => void
@@ -110,7 +124,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })),
       removeGoal: (id) =>
         commit((s) => ({ ...s, goals: s.goals.filter((g) => g.id !== id) })),
-      addExpense: (amount, date, category) =>
+      addExpense: (amount, date, category, direction = 'out', note) =>
         commit((s) => ({
           ...s,
           expenses: [
@@ -119,7 +133,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               id: newId(),
               amount,
               date,
+              direction,
               category,
+              note,
               createdAt: new Date().toISOString(),
             },
           ],
@@ -127,14 +143,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       importExpenses: (items) => {
         const have = new Set(
           state.expenses.map(
-            (e) => `${e.date}|${e.amount}|${(e.note ?? '').slice(0, 48).toLowerCase()}`,
+            (e) =>
+              `${e.date}|${e.amount}|${(e.note ?? '').slice(0, 48).toLowerCase()}|${e.direction}`,
           ),
         )
         const extra: Expense[] = []
         let duplicates = 0
         const now = new Date().toISOString()
         for (const item of items) {
-          const key = `${item.date}|${item.amount}|${item.note.slice(0, 48).toLowerCase()}`
+          const direction = item.direction === 'in' ? 'in' : 'out'
+          const key = `${item.date}|${item.amount}|${item.note.slice(0, 48).toLowerCase()}|${direction}`
           if (have.has(key)) {
             duplicates++
             continue
@@ -144,6 +162,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             id: newId(),
             amount: item.amount,
             date: item.date,
+            direction,
             category: item.category,
             note: item.note,
             createdAt: now,
@@ -173,7 +192,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           },
         })),
       resetBudget: () => commit((s) => ({ ...s, budget: emptyBudget() })),
-      completeOnboarding: () => commit((s) => ({ ...s, onboarded: true })),
+      setProfile: (name, birthYear) =>
+        commit((s) => ({ ...s, displayName: name.trim(), birthYear })),
+      setSavingsGoal: (name, targetAmount) =>
+        commit((s) => {
+          const existing = s.goals.find((g) => g.active) ?? s.goals[0]
+          const id = existing?.id ?? newId()
+          const goal: Goal = {
+            id,
+            type: existing?.type ?? 'egenkapital',
+            name: name.trim() || 'Sparing',
+            targetAmount: Math.max(0, Math.round(targetAmount)),
+            alreadySaved: existing?.alreadySaved ?? 0,
+            months: existing?.months ?? 12,
+            createdAt: existing?.createdAt ?? new Date().toISOString(),
+            active: true,
+          }
+          return { ...s, goals: [goal] }
+        }),
+      completeOnboarding: (name, birthYear) =>
+        commit((s) => ({
+          ...s,
+          onboarded: true,
+          displayName: name?.trim() || s.displayName,
+          birthYear: birthYear ?? s.birthYear,
+        })),
       loadDemo: () => commit(() => demoState()),
       resetAll: () => commit(() => emptyState()),
       replaceState: (next) => commit(() => next),

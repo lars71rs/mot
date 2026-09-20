@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { guessCategory, parseBankCsv, type BankRow } from '../bankCsv'
+import { guessCategory, parseBankStatement, type BankRow } from '../bankCsv'
 import { formatNok } from '../format'
 import { useStore } from '../store'
 
@@ -17,25 +17,50 @@ export function ImportBank({ onDone }: { onDone: () => void }) {
     setResult(null)
     setOutgoing(null)
     const name = file.name.toLowerCase()
-    if (name.endsWith('.pdf') || name.endsWith('.xlsx') || name.endsWith('.xls')) {
-      setError('Bruk CSV eller TXT fra nettbanken. PDF og Excel leser vi ikke ennå.')
+    if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+      setError('Excel støttes ikke ennå. Bruk PDF eller CSV fra nettbanken.')
       return
     }
-    const text = await file.text()
-    const parsed = parseBankCsv(text)
+    let parsed
+    if (name.endsWith('.pdf') || file.type === 'application/pdf') {
+      const pdfBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const s = String(reader.result || '')
+          const i = s.indexOf(',')
+          resolve(i >= 0 ? s.slice(i + 1) : s)
+        }
+        reader.onerror = () => reject(reader.error)
+        reader.readAsDataURL(file)
+      })
+      const res = await fetch('/api/parse-bank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pdfBase64 }),
+      })
+      parsed = (await res.json()) as { rows?: BankRow[]; skipped?: number; error?: string }
+      if (!res.ok || parsed.error) {
+        setError(parsed.error || 'Klarte ikke å lese PDF-en.')
+        return
+      }
+    } else {
+      const text = await file.text()
+      parsed = parseBankStatement(text)
+    }
     if (parsed.error) {
       setError(parsed.error)
       return
     }
-    const out = parsed.rows.filter((r) => r.direction === 'out')
-    const inn = parsed.rows.filter((r) => r.direction === 'in')
+    const rows = parsed.rows ?? []
+    const out = rows.filter((r) => r.direction === 'out')
+    const inn = rows.filter((r) => r.direction === 'in')
     if (out.length === 0) {
       setError('Filen har ingen utgående beløp å legge i forbruk.')
       return
     }
     setOutgoing(out)
     setIncoming(inn.length)
-    setSkipped(parsed.skipped)
+    setSkipped(parsed.skipped ?? 0)
   }
 
   function commit() {
@@ -46,6 +71,7 @@ export function ImportBank({ onDone }: { onDone: () => void }) {
         date: row.date,
         category: guessCategory(row.text),
         note: row.text,
+        direction: 'out' as const,
       })),
     )
     setResult(r)
@@ -56,9 +82,8 @@ export function ImportBank({ onDone }: { onDone: () => void }) {
       <p className="kicker">Bank</p>
       <h1>Dump en fil fra nettbanken</h1>
       <p className="lede">
-        I nettbanken: konto → transaksjoner → eksporter CSV (DNB kaller det ofte «til CSV» og
-        laster ned en .txt). Mot leser utgående beløp. Inn på konto, for eksempel lønn, går
-        ikke inn som forbruk — og vi logger ikke inn i banken.
+        Slipp kontoutskrift som PDF, eller CSV/TXT fra nettbanken. Mot leser utgående
+        beløp. Inn på konto (lønn) er ikke forbruk. Vi logger ikke inn i banken.
       </p>
 
       <label
@@ -77,7 +102,7 @@ export function ImportBank({ onDone }: { onDone: () => void }) {
       >
         <input
           type="file"
-          accept=".csv,.txt,text/csv,text/plain"
+          accept=".csv,.txt,.pdf,text/csv,text/plain,application/pdf"
           hidden
           onChange={(e) => {
             const file = e.target.files?.[0]
@@ -85,7 +110,7 @@ export function ImportBank({ onDone }: { onDone: () => void }) {
             e.target.value = ''
           }}
         />
-        Slipp CSV eller TXT her, eller klikk for å velge fil
+        Slipp PDF, CSV eller TXT her, eller klikk for å velge fil
       </label>
 
       {error && <p className="warn">{error}</p>}

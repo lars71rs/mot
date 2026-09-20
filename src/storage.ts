@@ -7,12 +7,20 @@ export function loadState(): AppState {
     const raw = localStorage.getItem(KEY)
     if (!raw) return emptyState()
     const parsed = JSON.parse(raw) as Partial<AppState>
+    const expenses = Array.isArray(parsed.expenses)
+      ? parsed.expenses.map((e) => ({
+          ...e,
+          direction: e.direction === 'in' ? ('in' as const) : ('out' as const),
+        }))
+      : []
     return {
       ...emptyState(),
       ...parsed,
+      displayName: typeof parsed.displayName === 'string' ? parsed.displayName : '',
+      birthYear: typeof parsed.birthYear === 'number' ? parsed.birthYear : null,
       fixed: Array.isArray(parsed.fixed) ? parsed.fixed : [],
       goals: Array.isArray(parsed.goals) ? parsed.goals : [],
-      expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
+      expenses,
       budget: parsed.budget
         ? {
             customized: Boolean(parsed.budget.customized),
