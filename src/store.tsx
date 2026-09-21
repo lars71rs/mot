@@ -214,12 +214,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         commit((s) => ({
           ...s,
           onboarded: true,
+          startedAt: s.startedAt || new Date().toISOString(),
           displayName: name?.trim() || s.displayName,
           birthYear: birthYear ?? s.birthYear,
         })),
       loadDemo: () => commit(() => demoState()),
       resetAll: () => commit(() => emptyState()),
-      replaceState: (next) => commit(() => next),
+      replaceState: (next) =>
+        commit((s) => ({
+          ...next,
+          startedAt: next.startedAt || s.startedAt || new Date().toISOString(),
+        })),
     }),
     [state, commit],
   )

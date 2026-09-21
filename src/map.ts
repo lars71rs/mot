@@ -90,10 +90,30 @@ export function monthsWithActivity(expenses: Pick<Expense, 'date'>[]): string[] 
   return [...keys].sort((a, b) => b.localeCompare(a))
 }
 
-export function visibleMonths(expenses: Pick<Expense, 'date'>[], now: Date): string[] {
+function monthFromStamp(value: string | Date | null | undefined, fallback: Date): string {
+  if (!value) return monthKey(fallback)
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return monthKey(fallback)
+  return monthKey(d)
+}
+
+/**
+ * Months you can open on the map.
+ * Floor = the month you joined, except the previous calendar month
+ * (the dump Mot asks for). Older rows in a CSV cannot unlock June
+ * if you downloaded in August.
+ */
+export function visibleMonths(
+  expenses: Pick<Expense, 'date'>[],
+  now: Date,
+  startedAt?: string | Date | null,
+): string[] {
   const activity = monthsWithActivity(expenses)
   const current = monthKey(now)
-  const first = activity.length ? activity[activity.length - 1] : current
+  const firstData = activity.length ? activity[activity.length - 1] : current
+  const joined = startedAt ? monthFromStamp(startedAt, now) : firstData
+  const dumpMonth = startedAt ? shiftMonthKey(joined, -1) : firstData
+  const first = firstData < dumpMonth ? dumpMonth : firstData
   const newest = activity[0] ?? current
   const last = newest > current ? newest : current
   const start = first < last ? first : last

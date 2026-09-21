@@ -983,8 +983,8 @@ h1 {
 }
 
 .kart-nav:disabled {
-  opacity: 0.28;
-  cursor: not-allowed;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .kart-grid {

@@ -66,4 +66,13 @@ describe('kart over forbruk', () => {
     ])
     expect(visibleMonths([], onDay('2026-09-16'))).toEqual(['2026-09'])
   })
+
+  it('kan ikke spole før nedlastingsmåneden, selv om CSV har eldre rader', () => {
+    const mixed = [
+      { date: '2026-06-04' },
+      { date: '2026-08-12' },
+    ]
+    expect(visibleMonths(mixed, onDay('2026-08-20'), '2026-08-03')).toEqual(['2026-07', '2026-08'])
+    expect(visibleMonths(mixed, onDay('2026-08-20'), '2026-08-03')).not.toContain('2026-06')
+  })
 })

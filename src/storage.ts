@@ -1,4 +1,13 @@
+import { monthsWithActivity } from './map'
 import { emptyBudget, emptyState, type AppState } from './types'
+
+function inferStartedAt(parsed: Partial<AppState>): string | null {
+  if (typeof parsed.startedAt === 'string' && parsed.startedAt) return parsed.startedAt
+  const months = monthsWithActivity(Array.isArray(parsed.expenses) ? parsed.expenses : [])
+  if (months.length) return `${months[months.length - 1]}-01T12:00:00.000Z`
+  if (parsed.onboarded) return new Date().toISOString()
+  return null
+}
 
 const KEY = 'mot.v1'
 
@@ -16,6 +25,7 @@ export function loadState(): AppState {
     return {
       ...emptyState(),
       ...parsed,
+      startedAt: inferStartedAt(parsed),
       displayName: typeof parsed.displayName === 'string' ? parsed.displayName : '',
       birthYear: typeof parsed.birthYear === 'number' ? parsed.birthYear : null,
       fixed: Array.isArray(parsed.fixed) ? parsed.fixed : [],

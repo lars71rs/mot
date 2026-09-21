@@ -28,6 +28,7 @@ export function demoState(): AppState {
   const now = new Date().toISOString()
   return {
     onboarded: true,
+    startedAt: '2026-09-01T12:00:00.000Z',
     displayName: 'Lars',
     birthYear: 2002,
     monthlyIncome: 52_000,

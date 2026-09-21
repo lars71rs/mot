@@ -1,0 +1,7 @@
+[variables]
+NIXPACKS_NODE_VERSION = "22"
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+NPM_CONFIG_PRODUCTION = "false"
+
+[start]
+cmd = "npm start"

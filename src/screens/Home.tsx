@@ -26,7 +26,7 @@ export function Home({
   const { state, setSavingsGoal } = useStore()
   const now = new Date()
   const activity = monthsWithActivity(state.expenses)
-  const allowed = visibleMonths(state.expenses, now)
+  const allowed = visibleMonths(state.expenses, now, state.startedAt)
   const fallbackKey = activity[0] ?? monthKey(now)
   const [viewKey, setViewKey] = useState(fallbackKey)
   const [txFilter, setTxFilter] = useState<'all' | 'in' | 'out'>('all')

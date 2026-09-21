@@ -50,6 +50,8 @@ export type BudgetState = {
 
 export type AppState = {
   onboarded: boolean
+  /** When they first used Mot. Month wheel cannot go earlier than this (minus the dump month). */
+  startedAt: string | null
   displayName: string
   birthYear: number | null
   monthlyIncome: number
@@ -104,6 +106,7 @@ export const emptyBudget = (): BudgetState => ({
 
 export const emptyState = (): AppState => ({
   onboarded: false,
+  startedAt: null,
   displayName: '',
   birthYear: null,
   monthlyIncome: 0,
