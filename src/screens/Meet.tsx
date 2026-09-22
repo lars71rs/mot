@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { guessCategory, type BankRow } from '../bankCsv'
+import { decodeBankBytes, guessCategory, type BankRow } from '../bankCsv'
 import { monthName } from '../format'
 import { useStore } from '../store'
 
@@ -188,7 +188,7 @@ export function Meet({ onMap }: { onMap: () => void }) {
     try {
       const payload = isPdf
         ? { pdfBase64: await fileToBase64(file) }
-        : { text: await file.text() }
+        : { text: decodeBankBytes(await file.arrayBuffer()) }
       const res = await fetch('/api/parse-bank', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -220,8 +220,8 @@ export function Meet({ onMap }: { onMap: () => void }) {
         }. Kartet er oppdatert.`
         commitMsgs([...messagesRef.current, { role: 'assistant', content: summary }])
         send(
-          `Jeg dumpet ${file.name}. ${result.added} poster er på kartet. Si hva du ser, og hva som ser fast ut.`,
-          text,
+          `Jeg dumpet ${file.name}. ${result.added} poster er på kartet (${ut} ut, ${inn} inn). Si hva du ser, og hva som ser fast ut.`,
+          undefined,
           true,
         )
         return

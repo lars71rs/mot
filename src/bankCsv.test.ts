@@ -101,4 +101,35 @@ describe('én beløp-kolonne', () => {
     expect(r.rows.find((x) => x.direction === 'out')?.amount).toBe(65)
     expect(r.rows.find((x) => x.direction === 'in')?.amount).toBe(200)
   })
+
+  it('positivt beløp uten lønn er ut, ikke inn', () => {
+    const csv = `Dato;Beskrivelse;Beløp
+10.08.2026;REMA 1000;189,00
+15.08.2026;Lønn august;27000,00`
+    const r = parseBankCsv(csv)
+    expect(r.rows.find((x) => /REMA/.test(x.text))?.direction).toBe('out')
+    expect(r.rows.find((x) => /Lønn/.test(x.text))?.direction).toBe('in')
+  })
+})
+
+describe('ekte bankfiler er ikke låst til testmalen', () => {
+  it('hopper over infolinjer før kolonnehodet', () => {
+    const csv = `Kontoutskrift
+Konto 1234.56.78901
+Periode: 01.08.2026 - 31.08.2026
+
+Bokført dato;Forklaring;Ut fra konto;Inn på konto
+31.08.2026;Netflix;149,00;
+15.08.2026;Lønn august;;27000,00`
+    const r = parseBankStatement(csv)
+    expect(r.error).toBeNull()
+    expect(r.rows).toHaveLength(2)
+    expect(r.rows.find((x) => /Netflix/.test(x.text))?.direction).toBe('out')
+  })
+
+  it('leser ISO-dato i brødtekst', () => {
+    const r = parseBankStatement('2026-08-28 REMA 1000 SCHOUS 189,00 12.411,20')
+    expect(r.rows[0]?.date).toBe('2026-08-28')
+    expect(r.rows[0]?.amount).toBe(189)
+  })
 })

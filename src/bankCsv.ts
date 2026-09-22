@@ -13,11 +13,56 @@ export type ParseResult = {
   error: string | null
 }
 
-const DATE_KEYS = ['dato', 'bokført', 'bokfort', 'booked', 'date', 'rentedato', 'valuedate']
-const TEXT_KEYS = ['forklaring', 'beskrivelse', 'tekst', 'text', 'melding', 'beskrivning']
-const OUT_KEYS = ['ut av konto', 'utavkonto', 'ut', 'debit', 'withdrawals']
-const IN_KEYS = ['inn på konto', 'innpakonto', 'inn', 'kredit', 'deposits']
-const AMOUNT_KEYS = ['beløp', 'belop', 'amount', 'sum']
+const DATE_KEYS = [
+  'bokført dato',
+  'bokfort dato',
+  'bokføringsdato',
+  'bokforingsdato',
+  'utført dato',
+  'utfort dato',
+  'transaksjonsdato',
+  'bokført',
+  'bokfort',
+  'bokføring',
+  'bokforing',
+  'rentedato',
+  'valuedate',
+  'booked',
+  'dato',
+  'date',
+]
+const TEXT_KEYS = [
+  'forklaring',
+  'beskrivelse',
+  'beskrivning',
+  'melding',
+  'tekst',
+  'text',
+  'mottaker',
+  'avsender',
+  'navn',
+  'tittel',
+]
+const OUT_KEYS = [
+  'ut av konto',
+  'ut fra konto',
+  'utavkonto',
+  'utgående',
+  'utgaende',
+  'withdrawals',
+  'debet',
+  'debit',
+]
+const IN_KEYS = [
+  'inn på konto',
+  'inn til konto',
+  'innpakonto',
+  'innkommende',
+  'deposits',
+  'kredit',
+  'credit',
+]
+const AMOUNT_KEYS = ['beløp', 'belop', 'amount', 'belopp']
 
 function stripBom(s: string): string {
   return s.replace(/^\uFEFF/, '')
@@ -60,17 +105,58 @@ function normKey(s: string): string {
     .trim()
 }
 
-function findCol(headers: string[], keys: string[]): number {
+function findCol(headers: string[], keys: string[], used: Set<number> = new Set()): number {
   const n = headers.map(normKey)
   for (const k of keys) {
-    const i = n.findIndex((h) => h === k || h.replace(/ /g, '') === k.replace(/ /g, ''))
+    const compact = k.replace(/ /g, '')
+    const i = n.findIndex(
+      (h, idx) => !used.has(idx) && (h === k || h.replace(/ /g, '') === compact),
+    )
     if (i >= 0) return i
   }
   for (const k of keys) {
-    const i = n.findIndex((h) => h.includes(k))
+    if (k.length < 4) continue
+    const i = n.findIndex((h, idx) => !used.has(idx) && h.includes(k))
     if (i >= 0) return i
   }
   return -1
+}
+
+/** DNB/SpareBank legger ofte 2–10 infolinjer over kolonnehodet. */
+function findCsvLayout(lines: string[]): { index: number; delim: string; headers: string[] } | null {
+  const n = Math.min(lines.length, 40)
+  for (let i = 0; i < n; i++) {
+    const delim = detectDelim(lines[i])
+    const headers = splitLine(lines[i], delim)
+    if (headers.length < 2) continue
+    const used = new Set<number>()
+    const dateI = findCol(headers, DATE_KEYS, used)
+    if (dateI < 0) continue
+    used.add(dateI)
+    const outI = findCol(headers, OUT_KEYS, used)
+    const inI = findCol(headers, IN_KEYS, used)
+    if (outI >= 0) used.add(outI)
+    if (inI >= 0) used.add(inI)
+    const amountI = findCol(headers, AMOUNT_KEYS, used)
+    if (outI >= 0 || inI >= 0 || amountI >= 0) {
+      return { index: i, delim, headers }
+    }
+  }
+  return null
+}
+
+export function decodeBankBytes(buf: ArrayBuffer | Uint8Array): string {
+  const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
+  if (u8.length >= 2 && u8[0] === 0xff && u8[1] === 0xfe) {
+    return new TextDecoder('utf-16le').decode(u8)
+  }
+  if (u8.length >= 2 && u8[0] === 0xfe && u8[1] === 0xff) {
+    return new TextDecoder('utf-16be').decode(u8)
+  }
+  if (u8.length > 8 && u8[1] === 0 && u8[3] === 0 && u8[0] !== 0) {
+    return new TextDecoder('utf-16le').decode(u8)
+  }
+  return new TextDecoder('utf-8').decode(u8)
 }
 
 export function parseNokAmount(raw: string): number | null {
@@ -96,24 +182,22 @@ export function parseNokAmount(raw: string): number | null {
 export function parseBankDate(raw: string): string | null {
   const t = raw.trim()
   const iso = t.match(/^(\d{4})-(\d{2})-(\d{2})/)
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
+  if (iso) return ymd(iso[1], iso[2], iso[3], false)
   const dot = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})/)
-  if (dot) {
-    const d = dot[1].padStart(2, '0')
-    const m = dot[2].padStart(2, '0')
-    let y = dot[3]
-    if (y.length === 2) y = Number(y) > 50 ? `19${y}` : `20${y}`
-    return `${y}-${m}-${d}`
-  }
+  if (dot) return ymd(dot[3], dot[2], dot[1], true)
   const slash = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/)
-  if (slash) {
-    const d = slash[1].padStart(2, '0')
-    const m = slash[2].padStart(2, '0')
-    let y = slash[3]
-    if (y.length === 2) y = `20${y}`
-    return `${y}-${m}-${d}`
-  }
+  if (slash) return ymd(slash[3], slash[2], slash[1], false)
   return null
+}
+
+function ymd(yearRaw: string, monthRaw: string, dayRaw: string, centuryFromDot: boolean): string | null {
+  let y = yearRaw
+  if (y.length === 2) y = centuryFromDot && Number(y) > 50 ? `19${y}` : `20${y}`
+  const year = Number(y)
+  const month = Number(monthRaw)
+  const day = Number(dayRaw)
+  if (year < 1990 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) return null
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
 export function guessCategory(text: string): ExpenseCategory | null {
@@ -162,13 +246,13 @@ const SKIP_LINE =
 function parseStatementLine(line: string): BankRow | null {
   const trimmed = line.replace(/\s+/g, ' ').trim()
   if (trimmed.length < 8 || SKIP_LINE.test(trimmed)) return null
-  const dateHit = trimmed.match(/(\d{1,2}\.\d{1,2}\.\d{2,4})/)
+  const dateHit = trimmed.match(/(?:^|\s)(\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{2,4})(?=\s|$)/)
   if (!dateHit || dateHit.index === undefined) return null
   const date = parseBankDate(dateHit[1])
   if (!date) return null
   const afterDate = trimmed
     .slice(dateHit.index + dateHit[0].length)
-    .replace(/^\s*\d{1,2}\.\d{1,2}\.\d{2,4}\s*/, '')
+    .replace(/^\s*(?:\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{2,4})\s*/, '')
   const amountRe = /-?\s*\d{1,3}(?:[.\s]\d{3})*,\d{2}-?|-?\s*\d+,\d{2}-?/g
   const amounts: { raw: string; value: number; index: number }[] = []
   let am: RegExpExecArray | null
@@ -206,10 +290,10 @@ export function parseBankText(text: string): ParseResult {
     let joined = lines[i]
     let row = parseStatementLine(joined)
     let used = 1
-    if (!row && /\d{1,2}\.\d{1,2}\.\d{2,4}/.test(joined)) {
+    if (!row && /\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{2,4}/.test(joined)) {
       for (let extra = 1; extra <= 4 && i + extra < lines.length; extra++) {
         const next = lines[i + extra]
-        if (extra > 1 && /^\d{1,2}\.\d{1,2}\.\d{2,4}/.test(next)) break
+        if (extra > 1 && /^(?:\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{2,4})/.test(next)) break
         joined = `${joined} ${next}`
         row = parseStatementLine(joined)
         used = extra + 1
@@ -217,7 +301,7 @@ export function parseBankText(text: string): ParseResult {
       }
     }
     if (!row) {
-      if (/\d{1,2}\.\d{1,2}\.\d{2,4}/.test(lines[i]) && /,/.test(lines[i])) skipped++
+      if (/(?:\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{2,4})/.test(lines[i]) && /[.,]\d{2}/.test(lines[i])) skipped++
       i += 1
       continue
     }
@@ -235,9 +319,9 @@ export function parseBankText(text: string): ParseResult {
 }
 
 function looksLikeCsv(raw: string): boolean {
-  const first = (raw.trim().split('\n', 1)[0] || '').toLowerCase()
-  if (!first.includes(';') && !first.includes(',')) return false
-  return DATE_KEYS.some((k) => first.includes(k))
+  const text = stripBom(raw).replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const lines = text.split('\n').filter((l) => l.trim().length > 0)
+  return findCsvLayout(lines) != null
 }
 
 export function parseBankStatement(raw: string): ParseResult {
@@ -258,24 +342,36 @@ export function parseBankCsv(raw: string): ParseResult {
   if (lines.length < 2) {
     return { rows: [], skipped: 0, error: 'Filen er tom, eller mangler rader.' }
   }
-  const delim = detectDelim(lines[0])
-  const headers = splitLine(lines[0], delim)
-  const dateI = findCol(headers, DATE_KEYS)
-  const textI = findCol(headers, TEXT_KEYS)
-  const outI = findCol(headers, OUT_KEYS)
-  const inI = findCol(headers, IN_KEYS)
-  const amountI = findCol(headers, AMOUNT_KEYS)
+  const layout = findCsvLayout(lines)
+  if (!layout) {
+    return {
+      rows: [],
+      skipped: 0,
+      error: 'Fant ikke dato og beløp. Eksporter CSV eller PDF fra nettbanken.',
+    }
+  }
+  const { delim, headers, index: headerAt } = layout
+  const used = new Set<number>()
+  const dateI = findCol(headers, DATE_KEYS, used)
+  used.add(dateI)
+  const outI = findCol(headers, OUT_KEYS, used)
+  if (outI >= 0) used.add(outI)
+  const inI = findCol(headers, IN_KEYS, used)
+  if (inI >= 0) used.add(inI)
+  const amountI = findCol(headers, AMOUNT_KEYS, used)
+  if (amountI >= 0) used.add(amountI)
+  const textI = findCol(headers, TEXT_KEYS, used)
   if (dateI < 0 || (outI < 0 && inI < 0 && amountI < 0)) {
     return {
       rows: [],
       skipped: 0,
-      error: 'Fant ikke dato og beløp. Eksporter CSV fra nettbanken (ikke PDF).',
+      error: 'Fant ikke dato og beløp. Eksporter CSV eller PDF fra nettbanken.',
     }
   }
 
   const rows: BankRow[] = []
   let skipped = 0
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = headerAt + 1; i < lines.length; i++) {
     const cols = splitLine(lines[i], delim)
     const date = parseBankDate(cols[dateI] ?? '')
     const label = textI >= 0 ? cols[textI] ?? '' : ''
@@ -299,7 +395,11 @@ export function parseBankCsv(raw: string): ParseResult {
       const a = parseNokAmount(cols[amountI] ?? '')
       if (a !== null && a !== 0) {
         amount = Math.abs(a)
-        direction = a < 0 ? 'out' : 'in'
+        direction = a < 0 || /-$/.test((cols[amountI] ?? '').replace(/\s/g, ''))
+          ? 'out'
+          : IN_HINT.test(label)
+            ? 'in'
+            : 'out'
       }
     }
     if (!direction || amount <= 0) {

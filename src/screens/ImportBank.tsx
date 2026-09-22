@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { guessCategory, parseBankStatement, type BankRow } from '../bankCsv'
+import { decodeBankBytes, guessCategory, parseBankStatement, type BankRow } from '../bankCsv'
 import { formatNok } from '../format'
 import { useStore } from '../store'
 
@@ -44,7 +44,7 @@ export function ImportBank({ onDone }: { onDone: () => void }) {
         return
       }
     } else {
-      const text = await file.text()
+      const text = decodeBankBytes(await file.arrayBuffer())
       parsed = parseBankStatement(text)
     }
     if (parsed.error) {
@@ -54,11 +54,11 @@ export function ImportBank({ onDone }: { onDone: () => void }) {
     const rows = parsed.rows ?? []
     const out = rows.filter((r) => r.direction === 'out')
     const inn = rows.filter((r) => r.direction === 'in')
-    if (out.length === 0) {
-      setError('Filen har ingen utgående beløp å legge i forbruk.')
+    if (rows.length === 0) {
+      setError('Fant ingen transaksjoner i filen.')
       return
     }
-    setOutgoing(out)
+    setOutgoing(rows)
     setIncoming(inn.length)
     setSkipped(parsed.skipped ?? 0)
   }
@@ -69,9 +69,9 @@ export function ImportBank({ onDone }: { onDone: () => void }) {
       outgoing.map((row) => ({
         amount: row.amount,
         date: row.date,
-        category: guessCategory(row.text),
+        category: row.direction === 'in' ? null : guessCategory(row.text),
         note: row.text,
-        direction: 'out' as const,
+        direction: row.direction,
       })),
     )
     setResult(r)
@@ -118,8 +118,8 @@ export function ImportBank({ onDone }: { onDone: () => void }) {
       {outgoing && !result && (
         <>
           <p className="hint">
-            {outgoing.length} utgifter klare
-            {incoming > 0 ? ` · ${incoming} innbetalinger hoppes over` : ''}
+            {outgoing.length} poster klare
+            {incoming > 0 ? ` · ${incoming} inn` : ''}
             {skipped > 0 ? ` · ${skipped} rader uten dato/beløp` : ''}
           </p>
           <ul className="rows">
