@@ -266,6 +266,36 @@ h1 {
   background: var(--paper-2);
 }
 
+.dump-drop {
+  min-height: 220px;
+  font-size: 1.05rem;
+}
+
+.dump-drop.is-busy {
+  cursor: wait;
+  color: var(--ink);
+}
+
+.text-link {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--forest);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.row .is-in {
+  color: var(--forest);
+}
+
+.row .is-out {
+  color: var(--rust);
+}
+
 .gate {
   min-height: 100dvh;
   display: flex;
@@ -971,6 +1001,12 @@ h1 {
 .kart-month h1 {
   margin: 0;
   font-size: 1.45rem;
+}
+
+.kart-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .kart-nav {

@@ -45,6 +45,7 @@ export function demoState(): AppState {
         active: true,
       },
     ],
+    viewMonth: '2026-09',
     expenses: [
       tx(1, 52_000, '2026-09-15', 'in', null, 'Lønn september', now),
       tx(2, 4_800, '2026-09-08', 'in', null, 'Designoppdrag', now),

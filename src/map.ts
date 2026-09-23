@@ -1,5 +1,5 @@
 import { categoryLabel, EXPENSE_CATEGORIES, type Expense, type ExpenseCategory } from './types'
-import { toISODate } from './format'
+import { monthTitleFromKey, toISODate } from './format'
 
 export type CategorySpend = {
   key: string
@@ -81,6 +81,24 @@ export function spentByMonth(
     .sort((a, b) => b.month.localeCompare(a.month))
 }
 
+export function dominantMonthKey(dates: string[]): string | null {
+  const counts = new Map<string, number>()
+  for (const d of dates) {
+    const key = d.slice(0, 7)
+    if (!/^\d{4}-\d{2}$/.test(key)) continue
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  let best: string | null = null
+  let n = 0
+  for (const [key, c] of counts) {
+    if (c > n || (c === n && best !== null && key > best)) {
+      best = key
+      n = c
+    }
+  }
+  return best
+}
+
 export function monthsWithActivity(expenses: Pick<Expense, 'date'>[]): string[] {
   const keys = new Set<string>()
   for (const e of expenses) {
@@ -97,11 +115,56 @@ function monthFromStamp(value: string | Date | null | undefined, fallback: Date)
   return monthKey(d)
 }
 
+export const PATTERN_MONTHS_NEEDED = 3
+
+export type DataCoverage = {
+  months: string[]
+  monthCount: number
+  txCount: number
+  enoughForPatterns: boolean
+  monthsNeeded: number
+  missing: number
+}
+
+export function dataCoverage(
+  expenses: Pick<Expense, 'date'>[],
+): DataCoverage {
+  const months = monthsWithActivity(expenses).slice().reverse()
+  const monthCount = months.length
+  const enoughForPatterns = monthCount >= PATTERN_MONTHS_NEEDED
+  return {
+    months,
+    monthCount,
+    txCount: expenses.length,
+    enoughForPatterns,
+    monthsNeeded: PATTERN_MONTHS_NEEDED,
+    missing: enoughForPatterns ? 0 : PATTERN_MONTHS_NEEDED - monthCount,
+  }
+}
+
+export function dumpKickMessage(viewMonth: string | null, c: DataCoverage): string {
+  const label = viewMonth ? monthTitleFromKey(viewMonth) : 'den åpne måneden'
+  const pattern = c.enoughForPatterns
+    ? 'Du har nok måneder til mønster. Pek på det som gjentar seg.'
+    : `Du har ${c.monthCount} av ${c.monthsNeeded} måneder. Be om mer fil under Kontoutskrift. Ikke late som mønster.`
+  return `Jeg la nettopp inn kontoutskrift. Kartet viser ${label}. Si hva du ser i den måneden: inn, ut, igjen. Hva ser fast ut? ${pattern}`
+}
+
+export function coverageCopy(c: DataCoverage): string {
+  if (c.monthCount === 0) {
+    return 'Ingen måneder inne. Legg inn kontoutskrift.'
+  }
+  if (!c.enoughForPatterns) {
+    const more = c.missing === 1 ? 'én måned til' : `${c.missing} måneder til`
+    return `${c.monthCount} av ${c.monthsNeeded} måneder inne. Ett bilde er ikke et mønster — dump ${more}.`
+  }
+  return `${c.monthCount} måneder inne. Nå kan vi snakke om det som gjentar seg.`
+}
+
 /**
- * Months you can open on the map.
- * Floor = the month you joined, except the previous calendar month
- * (the dump Mot asks for). Older rows in a CSV cannot unlock June
- * if you downloaded in August.
+ * Wheel: first month with data → now.
+ * Empty months before the first dump stay closed.
+ * Dumped history (even before signup) is visible.
  */
 export function visibleMonths(
   expenses: Pick<Expense, 'date'>[],
@@ -110,11 +173,11 @@ export function visibleMonths(
 ): string[] {
   const activity = monthsWithActivity(expenses)
   const current = monthKey(now)
-  const firstData = activity.length ? activity[activity.length - 1] : current
-  const joined = startedAt ? monthFromStamp(startedAt, now) : firstData
-  const dumpMonth = startedAt ? shiftMonthKey(joined, -1) : firstData
-  const first = firstData < dumpMonth ? dumpMonth : firstData
-  const newest = activity[0] ?? current
+  if (activity.length === 0) {
+    return [startedAt ? monthFromStamp(startedAt, now) : current]
+  }
+  const first = activity[activity.length - 1]
+  const newest = activity[0]
   const last = newest > current ? newest : current
   const start = first < last ? first : last
   const end = first < last ? last : first

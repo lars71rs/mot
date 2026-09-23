@@ -31,6 +31,10 @@ export function loadState(): AppState {
       fixed: Array.isArray(parsed.fixed) ? parsed.fixed : [],
       goals: Array.isArray(parsed.goals) ? parsed.goals : [],
       expenses,
+      viewMonth:
+        typeof parsed.viewMonth === 'string' && /^\d{4}-\d{2}$/.test(parsed.viewMonth)
+          ? parsed.viewMonth
+          : null,
       budget: parsed.budget
         ? {
             customized: Boolean(parsed.budget.customized),

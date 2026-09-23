@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  coverageCopy,
+  dataCoverage,
+  dumpKickMessage,
   inPocket,
   incomeThisMonth,
   leftoverThisMonth,
@@ -67,12 +70,38 @@ describe('kart over forbruk', () => {
     expect(visibleMonths([], onDay('2026-09-16'))).toEqual(['2026-09'])
   })
 
-  it('kan ikke spole før nedlastingsmåneden, selv om CSV har eldre rader', () => {
+  it('viser dumpede måneder, også før nedlasting — ikke tomme måneder før første fil', () => {
     const mixed = [
       { date: '2026-06-04' },
       { date: '2026-08-12' },
     ]
-    expect(visibleMonths(mixed, onDay('2026-08-20'), '2026-08-03')).toEqual(['2026-07', '2026-08'])
-    expect(visibleMonths(mixed, onDay('2026-08-20'), '2026-08-03')).not.toContain('2026-06')
+    expect(visibleMonths(mixed, onDay('2026-08-20'), '2026-08-03')).toEqual([
+      '2026-06',
+      '2026-07',
+      '2026-08',
+    ])
+    expect(visibleMonths(mixed, onDay('2026-08-20'), '2026-08-03')).not.toContain('2026-05')
+  })
+
+  it('3 måneder er nok til mønster, 1 er det ikke', () => {
+    const one = dataCoverage([{ date: '2026-08-04' }])
+    expect(one.monthCount).toBe(1)
+    expect(one.enoughForPatterns).toBe(false)
+    expect(one.missing).toBe(2)
+    expect(coverageCopy(one)).toMatch(/2 måneder til/)
+    const three = dataCoverage([
+      { date: '2026-06-01' },
+      { date: '2026-07-01' },
+      { date: '2026-08-01' },
+    ])
+    expect(three.enoughForPatterns).toBe(true)
+    expect(coverageCopy(three)).toMatch(/gjentar/)
+  })
+
+  it('kick etter dump peker på kartmåneden og dekning', () => {
+    const one = dataCoverage([{ date: '2026-08-04' }])
+    const msg = dumpKickMessage('2026-08', one)
+    expect(msg).toMatch(/august 2026/i)
+    expect(msg).toMatch(/1 av 3/)
   })
 })

@@ -24,6 +24,36 @@ describe('minister-verktøy', () => {
     expect(board.spentThisMonth).toBe(189)
     expect(board.leftover).toBe(-189)
     expect(board.usedFromSavings).toBe(189)
+    expect(
+      (runMinisterTool('get_board', {}, s, now).result as { coverage: { monthCount: number; enoughForPatterns: boolean } })
+        .coverage,
+    ).toEqual(expect.objectContaining({ monthCount: 1, enoughForPatterns: false, missing: 2 }))
+  })
+
+  it('snakker om måneden som er åpen på kartet, ikke i dag', () => {
+    let s = emptyState()
+    s.viewMonth = '2026-08'
+    s = runMinisterTool(
+      'add_expense',
+      { amount: 189, date: '2026-08-28', category: 'mat', note: 'REMA' },
+      s,
+      now,
+    ).state
+    s = runMinisterTool(
+      'add_expense',
+      { amount: 30, date: '2026-09-17', category: 'mat', note: 'Mat' },
+      s,
+      now,
+    ).state
+    s.viewMonth = '2026-08'
+    const board = runMinisterTool('get_board', {}, s, now).result as {
+      month: string
+      spent: number
+    }
+    expect(board.month).toBe('2026-08')
+    expect(board.spent).toBe(189)
+    const list = runMinisterTool('list_expenses', {}, s, now).result as { note: string }[]
+    expect(list.map((e) => e.note)).toEqual(['REMA'])
   })
 
   it('plukker utgifter ut av setninger', () => {

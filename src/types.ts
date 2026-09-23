@@ -59,6 +59,8 @@ export type AppState = {
   goals: Goal[]
   expenses: Expense[]
   budget: BudgetState
+  /** YYYY-MM currently open on the map. Minister talks about this month first. */
+  viewMonth: string | null
 }
 
 export type Route =
@@ -67,7 +69,7 @@ export type Route =
   | { name: 'income'; fromOnboarding: boolean }
   | { name: 'fixed'; fromOnboarding: boolean }
   | { name: 'home' }
-  | { name: 'meet' }
+  | { name: 'meet'; afterDump?: boolean }
   | { name: 'add-expense'; date?: string }
   | { name: 'category'; category: ExpenseCategory | null; month?: string }
   | { name: 'import' }
@@ -114,4 +116,5 @@ export const emptyState = (): AppState => ({
   goals: [],
   expenses: [],
   budget: emptyBudget(),
+  viewMonth: null,
 })

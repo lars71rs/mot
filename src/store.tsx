@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react'
 import { demoState } from './demo'
+import { dominantMonthKey } from './map'
 import { newId, saveState, loadState } from './storage'
 import type {
   AppState,
@@ -62,6 +63,7 @@ type Store = {
   loadDemo: () => void
   resetAll: () => void
   replaceState: (next: AppState) => void
+  setViewMonth: (month: string) => void
 }
 
 const StoreContext = createContext<Store | null>(null)
@@ -168,8 +170,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             createdAt: now,
           })
         }
+        const viewMonth = dominantMonthKey(extra.map((e) => e.date))
         if (extra.length) {
-          commit((s) => ({ ...s, expenses: [...s.expenses, ...extra] }))
+          commit((s) => ({
+            ...s,
+            expenses: [...s.expenses, ...extra],
+            viewMonth: viewMonth || s.viewMonth,
+          }))
         }
         return { added: extra.length, duplicates }
       },
@@ -224,7 +231,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         commit((s) => ({
           ...next,
           startedAt: next.startedAt || s.startedAt || new Date().toISOString(),
+          viewMonth: next.viewMonth || s.viewMonth,
         })),
+      setViewMonth: (month) =>
+        commit((s) =>
+          /^\d{4}-\d{2}$/.test(month) && s.viewMonth !== month ? { ...s, viewMonth: month } : s,
+        ),
     }),
     [state, commit],
   )

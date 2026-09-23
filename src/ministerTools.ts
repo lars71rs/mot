@@ -1,5 +1,6 @@
 import { guessCategory, parseBankStatement } from './bankCsv'
 import {
+  dataCoverage,
   dateFromMonthKey,
   incomeThisMonth,
   leftoverThisMonth,
@@ -37,6 +38,9 @@ function newId(): string {
 
 function boardDate(state: AppState, now: Date, monthArg?: string): Date {
   if (monthArg && /^\d{4}-\d{2}$/.test(monthArg)) return dateFromMonthKey(monthArg)
+  if (state.viewMonth && /^\d{4}-\d{2}$/.test(state.viewMonth)) {
+    return dateFromMonthKey(state.viewMonth)
+  }
   if (incomeThisMonth(state.expenses, now) > 0 || spentThisMonth(state.expenses, now) > 0) {
     return now
   }
@@ -55,6 +59,7 @@ function overview(state: AppState, now: Date, monthArg?: string) {
     name: state.displayName,
     birthYear: state.birthYear,
     month,
+    viewMonth: state.viewMonth,
     income,
     spent,
     spentThisMonth: spent,
@@ -67,6 +72,7 @@ function overview(state: AppState, now: Date, monthArg?: string) {
     byMonth: spentByMonth(state.expenses),
     spentThisWeek: spentThisWeek(state.expenses, now),
     txCount: state.expenses.length,
+    coverage: dataCoverage(state.expenses),
   }
 }
 
@@ -75,7 +81,7 @@ export const MINISTER_TOOLS = [
     type: 'function' as const,
     name: 'get_board',
     description:
-      'Les kartet: inn, ut, igjen, sparing, faste, kategorier og byMonth. Uten month: måneden med data, ellers i dag.',
+      'Les kartet for måneden brukeren har åpen (viewMonth), eller month hvis du oppgir YYYY-MM. Inn, ut, igjen, faste, byMonth, coverage.',
     parameters: {
       type: 'object',
       properties: { month: { type: 'string', description: 'YYYY-MM' } },
@@ -85,7 +91,7 @@ export const MINISTER_TOOLS = [
   {
     type: 'function' as const,
     name: 'list_expenses',
-    description: 'List utgifter. Uten filter: denne kalendermåneden. Bruk month fra byMonth for andre måneder.',
+    description: 'List utgifter. Uten month: måneden som er åpen på kartet (viewMonth).',
     parameters: {
       type: 'object',
       properties: {
@@ -291,7 +297,13 @@ export function runMinisterTool(
       const cat = typeof args.category === 'string' ? args.category : null
       const limit = typeof args.limit === 'number' ? args.limit : 40
       const monthArg = typeof args.month === 'string' ? args.month.trim() : ''
-      const prefix = /^\d{4}-\d{2}$/.test(monthArg) ? `${monthArg}-` : monthPrefixLocal(now)
+      const openMonth =
+        state.viewMonth && /^\d{4}-\d{2}$/.test(state.viewMonth) ? state.viewMonth : null
+      const prefix = /^\d{4}-\d{2}$/.test(monthArg)
+        ? `${monthArg}-`
+        : openMonth
+          ? `${openMonth}-`
+          : monthPrefixLocal(now)
       let list = s.expenses.filter((e) => e.date.startsWith(prefix))
       if (cat === 'ukjent') list = list.filter((e) => !e.category)
       else if (cat && CATEGORIES.includes(cat as ExpenseCategory)) {

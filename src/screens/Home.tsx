@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { formatNok, formatNokPlain, formatShortDate, monthTitleFromKey } from '../format'
 import {
+  coverageCopy,
+  dataCoverage,
   dateFromMonthKey,
   incomeThisMonth,
   leftoverThisMonth,
@@ -18,16 +20,21 @@ const DONUT = ['#1e4a3a', '#2f6b54', '#4d8f72', '#8f3d24', '#c4a574', '#5e584f',
 
 export function Home({
   onAdd,
+  onDump,
   onCategory,
 }: {
   onAdd: () => void
+  onDump?: () => void
   onCategory: (category: ExpenseCategory | null, month: string) => void
 }) {
-  const { state, setSavingsGoal } = useStore()
+  const { state, setSavingsGoal, setViewMonth } = useStore()
   const now = new Date()
   const activity = monthsWithActivity(state.expenses)
   const allowed = visibleMonths(state.expenses, now, state.startedAt)
-  const fallbackKey = activity[0] ?? monthKey(now)
+  const fallbackKey =
+    state.viewMonth && allowed.includes(state.viewMonth)
+      ? state.viewMonth
+      : (activity[0] ?? monthKey(now))
   const [viewKey, setViewKey] = useState(fallbackKey)
   const [txFilter, setTxFilter] = useState<'all' | 'in' | 'out'>('all')
   const [editGoal, setEditGoal] = useState(false)
@@ -38,10 +45,27 @@ export function Home({
   const prevMonth = monthIndex > 0 ? allowed[monthIndex - 1] : null
   const nextMonth = monthIndex >= 0 && monthIndex < allowed.length - 1 ? allowed[monthIndex + 1] : null
 
+  useEffect(() => {
+    if (state.viewMonth && state.viewMonth !== viewKey) {
+      setViewKey(state.viewMonth)
+    }
+  }, [state.viewMonth, viewKey])
+
+  useEffect(() => {
+    if (monthKeyShown) setViewMonth(monthKeyShown)
+  }, [monthKeyShown, setViewMonth])
+
+  function goMonth(key: string | null) {
+    if (!key) return
+    setViewKey(key)
+    setViewMonth(key)
+  }
+
   const view = dateFromMonthKey(monthKeyShown)
   const income = incomeThisMonth(state.expenses, view)
   const spent = spentThisMonth(state.expenses, view)
   const leftover = leftoverThisMonth(state.expenses, view)
+  const cover = dataCoverage(state.expenses)
   const categories = spentByCategory(state.expenses, view)
   const txs = monthExpenses(state.expenses, view)
   const shown = txs.filter((e) => {
@@ -80,7 +104,7 @@ export function Home({
             type="button"
             className="kart-nav"
             disabled={!prevMonth}
-            onClick={() => prevMonth && setViewKey(prevMonth)}
+            onClick={() => goMonth(prevMonth)}
           >
             ‹
           </button>
@@ -89,15 +113,34 @@ export function Home({
             type="button"
             className="kart-nav"
             disabled={!nextMonth}
-            onClick={() => nextMonth && setViewKey(nextMonth)}
+            onClick={() => goMonth(nextMonth)}
           >
             ›
           </button>
         </div>
-        <button type="button" className="btn-primary btn-small" onClick={onAdd}>
-          + Ny
-        </button>
+        <div className="kart-top-actions">
+          {onDump && (
+            <button type="button" className="btn-ghost btn-small" onClick={onDump}>
+              Kontoutskrift
+            </button>
+          )}
+          <button type="button" className="btn-primary btn-small" onClick={onAdd}>
+            + Ny
+          </button>
+        </div>
       </header>
+
+      {!cover.enoughForPatterns && (
+        <p className="hint kart-cover">
+          {coverageCopy(cover)}
+          {onDump ? ' ' : ''}
+          {onDump && (
+            <button type="button" className="text-link" onClick={onDump}>
+              Kontoutskrift
+            </button>
+          )}
+        </p>
+      )}
 
       <div className="kart-grid">
         <div className="kart-left">

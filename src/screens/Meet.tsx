@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { decodeBankBytes, guessCategory, type BankRow } from '../bankCsv'
+import { coverageCopy, dataCoverage, dumpKickMessage } from '../map'
+import { takeDumpKick } from '../dumpKick'
 import { monthName } from '../format'
 import { useStore } from '../store'
 
@@ -44,7 +46,15 @@ function persist(msgs: ChatMsg[]) {
   return trimmed
 }
 
-export function Meet({ onMap }: { onMap: () => void }) {
+export function Meet({
+  onMap,
+  onDump,
+  afterDump = false,
+}: {
+  onMap: () => void
+  onDump?: () => void
+  afterDump?: boolean
+}) {
   const { state, replaceState, importExpenses } = useStore()
   const [messages, setMessages] = useState<ChatMsg[]>(() => loadChat())
   const [draft, setDraft] = useState('')
@@ -61,10 +71,18 @@ export function Meet({ onMap }: { onMap: () => void }) {
   stateRef.current = state
   messagesRef.current = messages
   const hello = state.displayName ? `Hei ${state.displayName}.` : 'Hei.'
+  const cover = dataCoverage(state.expenses)
 
   useEffect(() => {
     persist(messages)
   }, [messages])
+
+  useEffect(() => {
+    if (!afterDump || !takeDumpKick()) return
+    send(dumpKickMessage(stateRef.current.viewMonth, dataCoverage(stateRef.current.expenses)))
+    // send is stable enough for a one-shot kick
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [afterDump])
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight })
@@ -299,20 +317,17 @@ export function Meet({ onMap }: { onMap: () => void }) {
           {messages.length === 0 && (
             <>
               <p className="lede">
-                {hello} Kan du legge inn kontoutskriften for {lastMonthLabel()}? PDF eller CSV —
-                slipp den her, eller bruk Fil. Ikke lim inn filstien. Jeg tegner kartet etterpå.
+                {hello} {cover.monthCount === 0
+                  ? `Bankfilen legger du inn under Kontoutskrift. Én måned er et bilde. Tre er et mønster. Forrige kalendermåned var ${lastMonthLabel()}.`
+                  : coverageCopy(cover)}
               </p>
-              <p className="hint">
-                Har du ikke en ekte fil ennå? Last ned en{' '}
-                <a href={`${import.meta.env.BASE_URL}test-kontoutskrift-august-2026.pdf`} download>
-                  test-PDF for august
-                </a>{' '}
-                eller{' '}
-                <a href={`${import.meta.env.BASE_URL}test-kontoutskrift-august-2026.csv`} download>
-                  CSV
-                </a>
-                .
-              </p>
+              {onDump && (
+                <p className="hint">
+                  <button type="button" className="text-link" onClick={onDump}>
+                    Legg inn kontoutskrift
+                  </button>
+                </p>
+              )}
             </>
           )}
           {messages.map((m, i) => (
@@ -359,7 +374,7 @@ export function Meet({ onMap }: { onMap: () => void }) {
                 void onDropFile(file)
               }
             }}
-            placeholder="Si noe, eller slipp PDF/CSV"
+            placeholder="Spør om kartet"
             disabled={busy}
           />
           <button type="submit" className="btn-primary" disabled={busy || !draft.trim()}>

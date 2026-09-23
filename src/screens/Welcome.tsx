@@ -11,13 +11,13 @@ export function Welcome({
       <h1>Slik starter du.</h1>
       <ol className="manual">
         <li>
-          Last ned kontoutskrift for <strong>forrige kalendermåned</strong> fra nettbanken (PDF
-          eller CSV).
+          Last ned kontoutskrift fra nettbanken (PDF eller CSV). Start med forrige måned —
+          tre måneder trengs for mønster.
         </li>
         <li>
-          Slipp filen i chatten, eller bruk <strong>Fil</strong>. Ikke lim inn filstien.
+          Slipp filen på <strong>Kontoutskrift</strong>. Ikke lim inn filstien.
         </li>
-        <li>Ministeren tegner kartet. Du retter i prat, ikke i et skjema.</li>
+        <li>Kartet fylles. Ministeren forklarer etterpå, i prat.</li>
       </ol>
       <div className="stack">
         <button type="button" className="btn-primary" onClick={onStart}>
