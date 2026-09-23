@@ -250,6 +250,71 @@ const IN_HINT =
 const SKIP_LINE =
   /kontonr|kontonummer|iban|bic\b|side\s+\d|kontoutskrift|org\.?\s*nr|fødsels|periode:|saldo fra|inngående saldo|utgående saldo$/i
 
+function isDigitChar(ch: string | undefined): boolean {
+  return ch !== undefined && ch >= '0' && ch <= '9'
+}
+
+/**
+ * Complete NOK amounts only — never a suffix of a longer digit run.
+ * 500,00 / 12.500,00 / 12 500,00 / 1.234.567,00.
+ * «6507 500,00», «6 507 500,00» and «6507500,00» are 500, not 507 500.
+ * 3+3 space groups (507 500) are the tail of a 4-digit ref + 500,00.
+ */
+export function findLineAmounts(s: string): { raw: string; value: number; index: number }[] {
+  s = stripStatementRefs(s)
+  const amounts: { raw: string; value: number; index: number }[] = []
+  const re = /,\d{2}-?/g
+  let tail: RegExpExecArray | null
+  while ((tail = re.exec(s)) !== null) {
+    const taken = amountEndingAt(s, tail.index, tail[0])
+    if (!taken) continue
+    const value = parseNokAmount(taken.raw)
+    if (value === null || value === 0) continue
+    amounts.push({ raw: taken.raw, value, index: taken.index })
+  }
+  return amounts
+}
+
+function amountEndingAt(
+  s: string,
+  commaAt: number,
+  tail: string,
+): { raw: string; index: number } | null {
+  const int = s.slice(0, commaAt)
+  const candidates: { raw: string; index: number }[] = []
+  const push = (m: RegExpMatchArray | null, rawGroup: number) => {
+    if (!m) return
+    const raw = m[rawGroup] + tail
+    const index = m[1].length
+    if (index > 0 && isDigitChar(s[index - 1])) return
+    candidates.push({ raw, index })
+  }
+  // 12 500 / 4 800 / 27.000 — 1–2 digit head + one thousands group.
+  push(int.match(/^(.*?)(-?\d{1,2}[.\s]\d{3})$/), 2)
+  // 1.234.567 — millions with dots, two or more groups.
+  push(int.match(/^(.*?)(-?\d{1,3}(?:\.\d{3}){2,})$/), 2)
+  // 500 or 27000 without separator.
+  push(int.match(/^(.*?)(-?\d{1,6})$/), 2)
+  // PDF glued «6507»+«500,00» → 6507500,00 (7 digits = 4-digit ref + 500).
+  const unsigned = int.replace(/^-/, '')
+  if (/^\d{7}$/.test(unsigned)) {
+    candidates.push({ raw: unsigned.slice(-3) + tail, index: commaAt - 3 })
+  }
+  if (candidates.length === 0) return null
+  candidates.sort((a, b) => b.raw.replace(/\s/g, '').length - a.raw.replace(/\s/g, '').length)
+  return candidates[0]
+}
+
+/** KID, «nr. 6507» and PDF-split «nr. 6 507» are not amounts. */
+function stripStatementRefs(s: string): string {
+  return s
+    .replace(/\bnr\.?:?\s*(?:(?!\d{1,3},\d{2})\d[\s.]*){2,8}/gi, 'nr ')
+    .replace(/\b\d(?:\s+\d){3}(?=\s+\d{1,3},\d{2})/g, ' ')
+    .replace(/\b\d\s+\d{3}(?=\s+\d{1,3},\d{2})/g, ' ')
+    .replace(/\b\d{4,5}(?=\s+\d{1,3},\d{2})/g, ' ')
+    .replace(/\b\d{6,}(?!,\d{2})\b/g, ' ')
+}
+
 function parseStatementLine(line: string): BankRow | null {
   const trimmed = line.replace(/\s+/g, ' ').trim()
   if (trimmed.length < 8 || SKIP_LINE.test(trimmed)) return null
@@ -260,20 +325,8 @@ function parseStatementLine(line: string): BankRow | null {
   const afterDate = trimmed
     .slice(dateHit.index + dateHit[0].length)
     .replace(/^\s*(?:\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{2,4})\s*/, '')
-  // KID, kontonr og «nr. 6507» er ikke beløp. Mellomrom-tusenskille
-  // i 6507 500,00 ble lest som 507 500.
-  const cleaned = afterDate
-    .replace(/\bnr\.?\s*\d\s+\d{3}\b/gi, 'nr')
-    .replace(/\bnr\.?\s*\d{4,8}\b/gi, 'nr')
-    .replace(/\b\d{6,}\b/g, '')
-  const amountRe = /(?<![\d.,])-?\d{1,3}(?:[.\s]\d{3})?,\d{2}-?|(?<![\d.,])-?\d+,\d{2}-?/g
-  const amounts: { raw: string; value: number; index: number }[] = []
-  let am: RegExpExecArray | null
-  while ((am = amountRe.exec(cleaned)) !== null) {
-    const value = parseNokAmount(am[0])
-    if (value === null || value === 0) continue
-    amounts.push({ raw: am[0], value, index: am.index })
-  }
+  const cleaned = stripStatementRefs(afterDate)
+  const amounts = findLineAmounts(cleaned)
   if (amounts.length === 0) return null
   const tx = amounts[0]
   const rawAt = afterDate.indexOf(tx.raw.replace(/\s+/g, ' ').trim())

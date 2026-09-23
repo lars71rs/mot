@@ -54,4 +54,22 @@ describe('pdfExtract', () => {
     expect(parsed.rows.find((r) => /REMA/i.test(r.text))?.date).toBe('2026-08-28')
     expect(parsed.rows.find((r) => /Kiosk/i.test(r.text))?.amount).toBe(67)
   })
+
+  it('limer ikke oppdragsnr 6507 med beløp 500,00', async () => {
+    const pdf = makeSimplePdf([
+      { x: 40, y: 700, t: '15.07.26' },
+      { x: 110, y: 700, t: '15.07.26' },
+      { x: 180, y: 700, t: 'Fast oppdrag nr.' },
+      { x: 290, y: 700, t: '6' },
+      { x: 300, y: 700, t: '507' },
+      { x: 400, y: 700, t: '500,00' },
+      { x: 480, y: 700, t: '15.07.26' },
+      { x: 530, y: 700, t: '797640054' },
+    ])
+    const text = await pdfBufferToText(pdf)
+    const parsed = parseBankStatement(text)
+    expect(parsed.rows[0]?.amount).toBe(500)
+    expect(parsed.rows[0]?.amount).not.toBe(507_500)
+    expect(parsed.rows[0]?.direction).toBe('out')
+  })
 })

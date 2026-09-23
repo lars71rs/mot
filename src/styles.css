@@ -165,6 +165,43 @@ h1 {
   white-space: pre-wrap;
 }
 
+.typing-dots {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 22px;
+  padding: 8px 4px 4px;
+}
+
+.typing-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: typing-bounce 0.9s ease-in-out infinite;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translateY(-7px);
+    opacity: 1;
+  }
+}
+
 .bubble-user {
   background: var(--paper-2);
   margin-left: auto;
@@ -172,6 +209,43 @@ h1 {
 
 .bubble-assistant {
   border: 1px solid var(--line);
+  white-space: normal;
+}
+
+.chat-md {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.chat-md p,
+.chat-md li {
+  margin: 0;
+}
+
+.chat-md-h {
+  font-weight: 700;
+  margin: 0.2rem 0 0;
+}
+
+.chat-md ul,
+.chat-md ol {
+  margin: 0;
+  padding: 0 0 0 1.15rem;
+}
+
+.chat-md li + li {
+  margin-top: 0.35rem;
+}
+
+.chat-md hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 0.4rem 0;
+}
+
+.chat-md strong {
+  font-weight: 700;
 }
 
 .meet-compose {

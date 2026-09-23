@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  findLineAmounts,
   guessCategory,
   parseBankCsv,
   parseBankDate,
@@ -118,6 +119,35 @@ Overføring Mellom Egne Konti`
       '15.07.26 15.07.26 Fast oppdrag nr. 6 507 500,00 15.07.26 797640054',
     )
     expect(r.rows[0]?.amount).toBe(500)
+  })
+
+  it('limer ikke 6507 og 500 uten ordet nr', () => {
+    const r = parseBankStatement('15.07.26 Fast oppdrag 6507 500,00 15.07.26 797640054')
+    expect(r.rows[0]?.amount).toBe(500)
+    expect(findLineAmounts('6507 500,00').map((a) => a.value)).toEqual([500])
+    expect(findLineAmounts('6 507 500,00').map((a) => a.value)).toEqual([500])
+    expect(findLineAmounts('6 507.500,00').map((a) => a.value)).toEqual([500])
+    expect(findLineAmounts('6507500,00').map((a) => a.value)).toEqual([500])
+    expect(findLineAmounts('nr.6507500,00').map((a) => a.value)).toEqual([500])
+    expect(findLineAmounts('6 5 0 7 500,00').map((a) => a.value)).toEqual([500])
+    const glued = parseBankStatement('15.07.26 Fast oppdrag nr.6507500,00')
+    expect(glued.rows[0]?.amount).toBe(500)
+    expect(findLineAmounts('27 000,00 39 411,20').map((a) => a.value)).toEqual([27_000, 39_411])
+    expect(findLineAmounts('4 800,00').map((a) => a.value)).toEqual([4_800])
+    expect(findLineAmounts('12.500,00').map((a) => a.value)).toEqual([12_500])
+    expect(findLineAmounts('1.234.567,00').map((a) => a.value)).toEqual([1_234_567])
+  })
+
+  it('leser 500 når PDF splitter nr. 6507 over flere linjer', () => {
+    const text = `15.07.26 15.07.26 Fast oppdrag
+nr. 6
+507
+500,00
+15.07.26 797640054`
+    const r = parseBankStatement(text)
+    expect(r.rows[0]?.amount).toBe(500)
+    expect(r.rows[0]?.amount).not.toBe(507_500)
+    expect(r.rows[0]?.direction).toBe('out')
   })
 })
 

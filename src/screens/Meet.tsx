@@ -3,6 +3,7 @@ import { decodeBankBytes, guessCategory, unreadStatementCopy, type BankRow } fro
 import { coverageCopy, dataCoverage, dumpKickMessage } from '../map'
 import { takeDumpKick } from '../dumpKick'
 import { monthName } from '../format'
+import { ChatBody } from '../ChatBody'
 import { useStore } from '../store'
 
 type ChatMsg = { role: 'user' | 'assistant'; content: string }
@@ -59,7 +60,6 @@ export function Meet({
   const [messages, setMessages] = useState<ChatMsg[]>(() => loadChat())
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
-  const [busyLabel, setBusyLabel] = useState('Ministeren leser…')
   const [error, setError] = useState<string | null>(null)
   const [drag, setDrag] = useState(false)
   const [mapReady, setMapReady] = useState(false)
@@ -156,7 +156,6 @@ export function Meet({
     if (runningRef.current) return
     runningRef.current = true
     setBusy(true)
-    setBusyLabel('Ministeren leser…')
     while (queueRef.current.length > 0) {
       const job = queueRef.current.shift()
       if (job) await runTurn(job.text, job.csv, job.logged)
@@ -201,7 +200,6 @@ export function Meet({
     const isPdf = lower.endsWith('.pdf') || file.type === 'application/pdf'
     commitMsgs([...messagesRef.current, { role: 'user', content: `Dumper ${file.name}` }])
     setBusy(true)
-    setBusyLabel(`Leser ${file.name}…`)
     setError(null)
     try {
       const payload = isPdf
@@ -321,10 +319,16 @@ export function Meet({
           )}
           {messages.map((m, i) => (
             <div key={i} className={`bubble bubble-${m.role}`}>
-              {m.content}
+              {m.role === 'assistant' ? <ChatBody text={m.content} /> : m.content}
             </div>
           ))}
-          {busy && <p className="hint">{busyLabel}</p>}
+          {busy && (
+            <div className="typing-dots" aria-hidden>
+              <span />
+              <span />
+              <span />
+            </div>
+          )}
         </div>
         {error && <p className="warn">{error}</p>}
         {mapReady && (

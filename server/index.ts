@@ -69,7 +69,8 @@ Regler:
 - En filsti er ikke filinnhold. Be dem bruke siden Kontoutskrift.
 - Når de sier at de har brukt penger: kall add_expense for hver post. Si aldri at du har lagt inn uten at verktøyet er kjørt.
 - Dato er valgfri; utelat den så brukes i dag.
-- Kort. Pek på tre ting, ikke tretti.`
+- Kort. Pek på tre ting, ikke tretti.
+- Markdown er greit: **halvfet**, bindestrek-lister og --- mellom avsnitt. Ikke nest stjerner.`
 
 const client = new OpenAI({
   apiKey: process.env.XAI_API_KEY,
