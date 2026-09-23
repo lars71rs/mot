@@ -7,7 +7,7 @@ import {
   ingestSpendUtterance,
   runMinisterTool,
 } from '../src/ministerTools.ts'
-import { parseBankStatement } from '../src/bankCsv.ts'
+import { parseBankStatement, unreadStatementCopy } from '../src/bankCsv.ts'
 import type { AppState } from '../src/types.ts'
 import { pdfBufferToText } from './pdfExtract.ts'
 
@@ -65,7 +65,7 @@ Regler:
 - Etter dump med under 3 måneder: si hva du ser i DEN måneden, og at du trenger flere måneder. Faste kandidater (husleie, mobil) er «ser fast ut» — ikke fakta ennå.
 - Etter 3+ måneder: det som kom tre ganger er fast nok til å foreslå. Ikke kall add_fixed før de sier ja.
 - Sparemål: ett mål. Sett det med set_savings_goal bare hvis de ber om det.
-- Hvis importen fant 0 rader, får du råtekst. Lag CSV (Dato;Forklaring;Ut av konto;Inn på konto) og kall import_bank_csv.
+- Finn aldri på beløp, datoer eller rader. Tall kommer bare fra parseren / tavlen. Hvis importen la inn 0 rader: si at filen ikke lot seg lese, be om CSV under Kontoutskrift. Ikke kall import_bank_csv med tekst du har funnet på.
 - En filsti er ikke filinnhold. Be dem bruke siden Kontoutskrift.
 - Når de sier at de har brukt penger: kall add_expense for hver post. Si aldri at du har lagt inn uten at verktøyet er kjørt.
 - Dato er valgfri; utelat den så brukes i dag.
@@ -226,6 +226,13 @@ async function runMinister(body: {
       duplicates?: number
     }
     const added = info.added ?? 0
+    if (added === 0) {
+      return {
+        text: unreadStatementCopy(pdfB64 ? 'pdf' : 'text'),
+        snapshot: state,
+        actions,
+      }
+    }
     let content = `BANKIMPORT allerede kjørt. Resultat: ${JSON.stringify({
       added,
       error: info.error ?? null,
@@ -234,14 +241,8 @@ async function runMinister(body: {
       months: info.months ?? [],
       sample: info.sample ?? [],
     })}.`
-    if (added > 0) {
-      content +=
-        ' Transaksjonene har datoene fra filen. spentThisMonth er bare inneværende måned — se byMonth. Ikke si at PDF ikke støttes, og ikke importer på nytt.'
-    } else {
-      content +=
-        ' Ingen rader ble plukket automatisk. Her er teksten fra filen. Lag CSV med kolonnene Dato;Forklaring;Ut av konto;Inn på konto og kall import_bank_csv én gang.\n\n'
-      content += statementText.slice(0, 14_000)
-    }
+    content +=
+      ' Transaksjonene har datoene fra filen. spentThisMonth er bare inneværende måned — se byMonth. Ikke si at PDF ikke støttes, og ikke importer på nytt. Finn ikke på beløp.'
     input.push({ role: 'user', content })
   } else if (lastUser && actions.includes('add_expense')) {
     input.push({

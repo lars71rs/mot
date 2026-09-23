@@ -13,6 +13,13 @@ export type ParseResult = {
   error: string | null
 }
 
+export function unreadStatementCopy(kind: 'pdf' | 'text' = 'text'): string {
+  if (kind === 'pdf') {
+    return 'PDF-en lot seg ikke lese som tabell (ofte skann eller bilde). Eksporter CSV fra nettbanken og slipp den under Kontoutskrift. Jeg gjetter ikke beløp.'
+  }
+  return 'Fant ingen transaksjoner i filen. Prøv CSV fra nettbanken under Kontoutskrift. Jeg gjetter ikke beløp.'
+}
+
 const DATE_KEYS = [
   'bokført dato',
   'bokfort dato',
@@ -239,7 +246,7 @@ export function guessCategory(text: string): ExpenseCategory | null {
 }
 
 const IN_HINT =
-  /lønn|\blonn\b|salary|innbetaling|innskudd|refusjon|tilbake|overføring fra|overforing fra|from |vipps fra|utbetaling fra|oppdrag|freelance|honorar/i
+  /lønn|\blonn\b|salary|innbetaling|innskudd|refusjon|tilbake|overføring fra|overforing fra|from |vipps fra|utbetaling fra|fra oppdrag|freelance|honorar/i
 const SKIP_LINE =
   /kontonr|kontonummer|iban|bic\b|side\s+\d|kontoutskrift|org\.?\s*nr|fødsels|periode:|saldo fra|inngående saldo|utgående saldo$/i
 
@@ -253,19 +260,27 @@ function parseStatementLine(line: string): BankRow | null {
   const afterDate = trimmed
     .slice(dateHit.index + dateHit[0].length)
     .replace(/^\s*(?:\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{2,4})\s*/, '')
-  const amountRe = /-?\s*\d{1,3}(?:[.\s]\d{3})*,\d{2}-?|-?\s*\d+,\d{2}-?/g
+  // KID, kontonr og «nr. 6507» er ikke beløp. Mellomrom-tusenskille
+  // i 6507 500,00 ble lest som 507 500.
+  const cleaned = afterDate
+    .replace(/\bnr\.?\s*\d\s+\d{3}\b/gi, 'nr')
+    .replace(/\bnr\.?\s*\d{4,8}\b/gi, 'nr')
+    .replace(/\b\d{6,}\b/g, '')
+  const amountRe = /(?<![\d.,])-?\d{1,3}(?:[.\s]\d{3})?,\d{2}-?|(?<![\d.,])-?\d+,\d{2}-?/g
   const amounts: { raw: string; value: number; index: number }[] = []
   let am: RegExpExecArray | null
-  while ((am = amountRe.exec(afterDate)) !== null) {
+  while ((am = amountRe.exec(cleaned)) !== null) {
     const value = parseNokAmount(am[0])
     if (value === null || value === 0) continue
     amounts.push({ raw: am[0], value, index: am.index })
   }
   if (amounts.length === 0) return null
   const tx = amounts[0]
+  const rawAt = afterDate.indexOf(tx.raw.replace(/\s+/g, ' ').trim())
+  const cut = rawAt >= 0 ? rawAt : tx.index
   const text =
     afterDate
-      .slice(0, tx.index)
+      .slice(0, cut)
       .replace(/\s+/g, ' ')
       .replace(/\bsaldo\b.*$/i, '')
       .trim() || 'Utgift'

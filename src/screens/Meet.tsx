@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { decodeBankBytes, guessCategory, type BankRow } from '../bankCsv'
+import { decodeBankBytes, guessCategory, unreadStatementCopy, type BankRow } from '../bankCsv'
 import { coverageCopy, dataCoverage, dumpKickMessage } from '../map'
 import { takeDumpKick } from '../dumpKick'
 import { monthName } from '../format'
@@ -219,7 +219,6 @@ export function Meet({
       }
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
       const rows = data.rows ?? []
-      const text = data.text?.trim() || ''
       if (rows.length > 0) {
         const result = importExpenses(
           rows.map((row) => ({
@@ -244,24 +243,14 @@ export function Meet({
         )
         return
       }
-      if (!text) {
-        commitMsgs([
-          ...messagesRef.current,
-          {
-            role: 'assistant',
-            content: isPdf
-              ? 'PDF-en har ikke lesbar tekst (sannsynligvis et bilde/skann). Eksporter CSV fra nettbanken.'
-              : 'Fant ingen transaksjoner i filen.',
-          },
-        ])
-        setBusy(false)
-        return
-      }
-      send(
-        `Jeg dumpet ${file.name}, men den automatiske lesingen fant ingen rader. Her er teksten.`,
-        text,
-        true,
-      )
+      commitMsgs([
+        ...messagesRef.current,
+        {
+          role: 'assistant',
+          content: unreadStatementCopy(isPdf ? 'pdf' : 'text'),
+        },
+      ])
+      setBusy(false)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Klarte ikke å lese filen.'
       setError(msg)

@@ -184,7 +184,7 @@ export const MINISTER_TOOLS = [
     type: 'function' as const,
     name: 'import_bank_csv',
     description:
-      'Les CSV/TXT fra norsk nettbank. Legger både inn og ut på kartet. Hopper over duplikater.',
+      'Les ekte CSV/TXT som brukeren har limt inn. ALDRI dikte rader eller beløp. Hvis teksten ikke er en kontoutskrift, returner error.',
     parameters: {
       type: 'object',
       properties: { csv: { type: 'string', description: 'Hele filinnholdet' } },

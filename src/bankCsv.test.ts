@@ -6,7 +6,16 @@ import {
   parseBankStatement,
   parseBankText,
   parseNokAmount,
+  unreadStatementCopy,
 } from './bankCsv'
+
+describe('ikke gjette beløp', () => {
+  it('sier ifra uten å be Grok dikte rader', () => {
+    expect(unreadStatementCopy('pdf')).toMatch(/gjetter ikke beløp/)
+    expect(unreadStatementCopy('text')).toMatch(/gjetter ikke beløp/)
+    expect(unreadStatementCopy('pdf')).not.toMatch(/lag CSV/i)
+  })
+})
 
 describe('bankdato og beløp', () => {
   it('leser norsk dato og komma-beløp', () => {
@@ -89,6 +98,26 @@ describe('PDF-tekst er ikke CSV-feil', () => {
     const r = parseBankStatement('08.08.2026 Overforing fra oppdrag 4 800,00 12.411,20')
     expect(r.rows[0]?.direction).toBe('in')
     expect(r.rows[0]?.amount).toBe(4_800)
+  })
+
+  it('leser 500,00 ved fast oppdrag nr. 6507, ikke 507 500', () => {
+    const text = `15.07.26 15.07.26 Fast oppdrag nr. 6507 500,00 15.07.26 797640054
+Lars Rune Aasland
+Overføring Mellom Egne Konti`
+    const r = parseBankStatement(text)
+    expect(r.error).toBeNull()
+    const row = r.rows.find((x) => /oppdrag/i.test(x.text))
+    expect(row?.amount).toBe(500)
+    expect(row?.amount).not.toBe(507_500)
+    expect(row?.date).toBe('2026-07-15')
+    expect(row?.text).toMatch(/6507/)
+  })
+
+  it('leser 500,00 også når 6507 er splittet i PDF', () => {
+    const r = parseBankStatement(
+      '15.07.26 15.07.26 Fast oppdrag nr. 6 507 500,00 15.07.26 797640054',
+    )
+    expect(r.rows[0]?.amount).toBe(500)
   })
 })
 
