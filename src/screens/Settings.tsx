@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { formatNok } from '../format'
+import { fixedFacts } from '../recurring'
 import { useStore } from '../store'
 
 export function Settings({ onReset }: { onReset: () => void }) {
@@ -7,6 +8,7 @@ export function Settings({ onReset }: { onReset: () => void }) {
   const [name, setName] = useState(state.displayName)
   const [year, setYear] = useState(state.birthYear ? String(state.birthYear) : '')
   const goal = state.goals.find((g) => g.active) ?? null
+  const facts = fixedFacts(state.expenses)
   const [goalName, setGoalName] = useState(goal?.name ?? '')
   const [goalAmount, setGoalAmount] = useState(goal ? String(goal.targetAmount) : '')
 
@@ -71,6 +73,12 @@ export function Settings({ onReset }: { onReset: () => void }) {
       />
       {goal ? <p className="hint">Mål: {formatNok(goal.targetAmount)}</p> : null}
 
+      {facts.length > 0 && (
+        <p className="hint">
+          Faste fra tre treff:{' '}
+          {facts.map((f) => `${f.name} ${formatNok(f.amount)}`).join(', ')}
+        </p>
+      )}
       {state.fixed.length > 0 && (
         <p className="hint">
           Faste ministeren har lagt inn:{' '}

@@ -10,6 +10,7 @@ import {
   spentThisMonth,
   spentThisWeek,
 } from './map'
+import { fixedFacts } from './recurring'
 import type { AppState, Expense, ExpenseCategory, FixedExpense, Goal } from './types'
 
 export type ToolResult = {
@@ -68,6 +69,7 @@ function overview(state: AppState, now: Date, monthArg?: string) {
     usedFromSavings: leftover < 0 ? -leftover : 0,
     goal: goal ? { name: goal.name, target: goal.targetAmount } : null,
     fixed: state.fixed.map((f) => ({ id: f.id, name: f.name, amount: f.amount })),
+    fixedFacts: fixedFacts(state.expenses),
     byCategory: spentByCategory(state.expenses, view),
     byMonth: spentByMonth(state.expenses),
     spentThisWeek: spentThisWeek(state.expenses, now),
@@ -81,7 +83,7 @@ export const MINISTER_TOOLS = [
     type: 'function' as const,
     name: 'get_board',
     description:
-      'Les kartet for måneden brukeren har åpen (viewMonth), eller month hvis du oppgir YYYY-MM. Inn, ut, igjen, faste, byMonth, coverage.',
+      'Les kartet for måneden brukeren har åpen (viewMonth), eller month hvis du oppgir YYYY-MM. Inn, ut, igjen, faste, fixedFacts, byMonth, coverage.',
     parameters: {
       type: 'object',
       properties: { month: { type: 'string', description: 'YYYY-MM' } },
@@ -158,7 +160,8 @@ export const MINISTER_TOOLS = [
   {
     type: 'function' as const,
     name: 'add_fixed',
-    description: 'Legg til en fast månedlig utgift (husleie, lån, mobil).',
+    description:
+      'Legg til en fast utgift bare hvis brukeren ber om det. Tre treff ligger allerede på board.fixedFacts — ikke kopier dem hit uten at de sier ja.',
     parameters: {
       type: 'object',
       properties: {

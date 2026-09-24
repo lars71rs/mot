@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  checkSaldoChain,
   findLineAmounts,
   guessCategory,
   parseBankCsv,
@@ -168,6 +169,42 @@ describe('én beløp-kolonne', () => {
     const r = parseBankCsv(csv)
     expect(r.rows.find((x) => /REMA/.test(x.text))?.direction).toBe('out')
     expect(r.rows.find((x) => /Lønn/.test(x.text))?.direction).toBe('in')
+  })
+})
+
+describe('saldo-sjekk', () => {
+  it('godkjenner DNB-kjede nyest først', () => {
+    const csv = `Bokført dato;Forklaring;Ut av konto;Inn på konto;Saldo
+31.08.2026;Netflix;149,00;;18 412,20
+28.08.2026;REMA 1000;189,00;;18 561,20`
+    const r = parseBankCsv(csv)
+    expect(r.rows.every((row) => !row.saldoMismatch)).toBe(true)
+    expect(r.rows[0]?.saldo).toBe(18_412)
+  })
+
+  it('merker posten som ikke forklarer saldo-hoppet', () => {
+    const csv = `Bokført dato;Forklaring;Ut av konto;Inn på konto;Saldo
+31.08.2026;Fast oppdrag;507500,00;;18 412,20
+28.08.2026;REMA 1000;189,00;;18 561,20`
+    const r = parseBankCsv(csv)
+    const bad = r.rows.find((row) => /oppdrag/i.test(row.text))
+    expect(bad?.saldoMismatch).toBe(true)
+    expect(r.rows.find((row) => /REMA/i.test(row.text))?.saldoMismatch).toBeFalsy()
+  })
+
+  it('godkjenner eldst-først CSV', () => {
+    const csv = `Dato;Tekst;Ut av konto;Inn på konto;Saldo
+28.08.2026;REMA 1000;189,00;;18 561,20
+31.08.2026;Netflix;149,00;;18 412,20`
+    expect(parseBankCsv(csv).rows.every((row) => !row.saldoMismatch)).toBe(true)
+  })
+
+  it('uten saldo-kolonne merker ingenting', () => {
+    const flagged = checkSaldoChain([
+      { date: '2026-08-31', amount: 149, text: 'Netflix', direction: 'out' },
+      { date: '2026-08-28', amount: 189, text: 'REMA', direction: 'out' },
+    ])
+    expect(flagged.every((row) => !row.saldoMismatch)).toBe(true)
   })
 })
 

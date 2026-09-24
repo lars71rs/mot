@@ -29,7 +29,6 @@ export default function App() {
   }, [demoTried, loadDemo])
 
   const goMeet = () => setRoute({ name: 'meet' })
-  const goMeetAfterDump = () => setRoute({ name: 'meet', afterDump: true })
   const goHome = () => setRoute({ name: 'home' })
   const goImport = () => setRoute({ name: 'import' })
   const goAdd = () => setRoute({ name: 'add-expense' })
@@ -72,7 +71,7 @@ export default function App() {
       body = <AddExpense onBack={goHome} onDone={goHome} />
       break
     case 'import':
-      body = <ImportBank onDone={goHome} onTalk={goMeet} onAfterDump={goMeetAfterDump} />
+      body = <ImportBank onDone={goHome} onTalk={goMeet} />
       break
     case 'meet':
       body = (

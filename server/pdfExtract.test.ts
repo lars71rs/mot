@@ -112,5 +112,6 @@ describe('pdfExtract', () => {
     expect(parsed.rows.find((r) => /oppdrag/i.test(r.text))?.direction).toBe('in')
     expect(parsed.rows.find((r) => /oppdrag/i.test(r.text))?.amount).toBe(4_800)
     expect(parsed.rows.every((r) => r.amount !== 507_500)).toBe(true)
+    expect(parsed.rows.every((r) => !r.saldoMismatch)).toBe(true)
   })
 })

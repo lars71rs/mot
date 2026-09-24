@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { decodeBankBytes, guessCategory, parseBankStatement, type BankRow } from '../bankCsv'
 import { formatNok } from '../format'
 import { coverageCopy, dataCoverage } from '../map'
-import { armDumpKick } from '../dumpKick'
 import { useStore } from '../store'
 
 const MAX_FILE = 8 * 1024 * 1024
@@ -10,11 +9,9 @@ const MAX_FILE = 8 * 1024 * 1024
 export function ImportBank({
   onDone,
   onTalk,
-  onAfterDump,
 }: {
   onDone: () => void
   onTalk?: () => void
-  onAfterDump?: () => void
 }) {
   const { state, importExpenses } = useStore()
   const cover = dataCoverage(state.expenses)
@@ -89,9 +86,8 @@ export function ImportBank({
       })),
     )
     setResult(r)
-    if (onAfterDump && (r.added > 0 || r.duplicates > 0)) {
-      armDumpKick()
-      onAfterDump()
+    if (r.added > 0 || r.duplicates > 0) {
+      onDone()
     }
   }
 
@@ -161,12 +157,28 @@ export function ImportBank({
             {incoming ? ` · ${incoming} inn` : ''}
             {skipped > 0 ? ` · ${skipped} rader uten dato/beløp` : ''}
           </p>
+          {rows.some((r) => r.saldoMismatch) && (
+            <p className="warn">
+              {rows.filter((r) => r.saldoMismatch).length === 1
+                ? '1 post stemmer ikke med saldo i filen. Sjekk den merkte raden.'
+                : `${rows.filter((r) => r.saldoMismatch).length} poster stemmer ikke med saldo i filen. Sjekk de merkte radene.`}
+              {rows.filter((r) => r.saldoMismatch).length * 2 >= rows.length
+                ? ' CSV fra nettbanken treffer ofte bedre enn PDF.'
+                : ''}
+            </p>
+          )}
           <ul className="rows">
-            {rows.slice(0, 12).map((row, i) => (
-              <li key={`${row.date}-${i}`} className="row">
+            {previewRows(rows).map((row, i) => (
+              <li
+                key={`${row.date}-${i}`}
+                className={`row${row.saldoMismatch ? ' is-warn' : ''}`}
+              >
                 <span>
                   <strong>{row.text || (row.direction === 'in' ? 'Inn' : 'Utgift')}</strong>
-                  <em>{row.date}</em>
+                  <em>
+                    {row.date}
+                    {row.saldoMismatch ? ' · stemmer ikke med saldo' : ''}
+                  </em>
                 </span>
                 <em className={row.direction === 'in' ? 'is-in' : 'is-out'}>
                   {row.direction === 'in' ? '+' : '−'} {formatNok(row.amount)}
@@ -174,7 +186,7 @@ export function ImportBank({
               </li>
             ))}
           </ul>
-          {rows.length > 12 && <p className="hint">…og {rows.length - 12} til</p>}
+          {rows.length > 12 && <p className="hint">…og {Math.max(0, rows.length - previewRows(rows).length)} til</p>}
           <div className="stack">
             <button type="button" className="btn-primary" onClick={commit}>
               Legg inn i kartet
@@ -204,6 +216,12 @@ export function ImportBank({
       )}
     </main>
   )
+}
+
+function previewRows(rows: BankRow[]): BankRow[] {
+  const head = rows.slice(0, 12)
+  const extra = rows.filter((r, i) => r.saldoMismatch && i >= 12)
+  return extra.length ? [...head, ...extra] : head
 }
 
 function fileToBase64(file: File): Promise<string> {

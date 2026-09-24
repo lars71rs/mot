@@ -170,11 +170,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             createdAt: now,
           })
         }
-        const viewMonth = dominantMonthKey(extra.map((e) => e.date))
-        if (extra.length) {
+        const viewMonth = dominantMonthKey(
+          (extra.length ? extra : items).map((e) => e.date),
+        )
+        if (extra.length || viewMonth) {
           commit((s) => ({
             ...s,
-            expenses: [...s.expenses, ...extra],
+            expenses: extra.length ? [...s.expenses, ...extra] : s.expenses,
             viewMonth: viewMonth || s.viewMonth,
           }))
         }

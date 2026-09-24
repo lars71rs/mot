@@ -18,6 +18,7 @@ type TxRow = {
   amountRaw: string
   amount: number
   txX: number
+  saldoRaw?: string
 }
 
 const AMOUNT_CELL = /^-?[\d.\s]+,\d{2}-?$/
@@ -173,12 +174,14 @@ export function rowsToStatementCsv(rows: Row[]): string | null {
     if (!row.date || row.amounts.length === 0) continue
     const sorted = [...row.amounts].sort((a, b) => a.x - b.x)
     const tx = sorted.length >= 2 ? sorted[sorted.length - 2] : sorted[0]
+    const saldo = sorted.length >= 2 ? sorted[sorted.length - 1] : null
     txs.push({
       date: row.date,
       text: row.text || 'Utgift',
       amountRaw: tx.raw,
       amount: Math.abs(tx.value),
       txX: tx.x,
+      saldoRaw: saldo && saldo !== tx ? saldo.raw : undefined,
     })
   }
   if (txs.length === 0) return null
@@ -186,19 +189,21 @@ export function rowsToStatementCsv(rows: Row[]): string | null {
   const split = twoMeans(txs.map((t) => t.txX))
   const lines: string[] = []
   if (split) {
-    lines.push('Bokført dato;Forklaring;Ut av konto;Inn på konto')
+    lines.push('Bokført dato;Forklaring;Ut av konto;Inn på konto;Saldo')
     for (const tx of txs) {
       const inn = tx.txX >= split.split
       const outRaw = inn ? '' : tx.amountRaw
       const inRaw = inn ? tx.amountRaw : ''
-      lines.push(`${csvCell(tx.date)};${csvCell(tx.text)};${csvCell(outRaw)};${csvCell(inRaw)}`)
+      lines.push(
+        `${csvCell(tx.date)};${csvCell(tx.text)};${csvCell(outRaw)};${csvCell(inRaw)};${csvCell(tx.saldoRaw ?? '')}`,
+      )
     }
   } else {
-    lines.push('Bokført dato;Forklaring;Beløp')
+    lines.push('Bokført dato;Forklaring;Beløp;Saldo')
     for (const tx of txs) {
       const signed =
         tx.amountRaw.includes('-') || tx.amountRaw.includes('−') ? `-${tx.amountRaw.replace(/[-−]/g, '')}` : tx.amountRaw
-      lines.push(`${csvCell(tx.date)};${csvCell(tx.text)};${csvCell(signed)}`)
+      lines.push(`${csvCell(tx.date)};${csvCell(tx.text)};${csvCell(signed)};${csvCell(tx.saldoRaw ?? '')}`)
     }
   }
   return lines.join('\n')

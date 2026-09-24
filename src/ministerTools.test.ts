@@ -111,6 +111,24 @@ describe('minister-verktøy', () => {
     expect(out.board.byMonth).toEqual([{ month: '2026-08', amount: 256 }])
   })
 
+  it('legger tre husleie-treff på tavlen som fakta, ikke gjetning', () => {
+    let s = emptyState()
+    for (const date of ['2026-06-01', '2026-07-01', '2026-08-01']) {
+      s = runMinisterTool(
+        'add_expense',
+        { amount: 12_500, date, note: 'Husleie' },
+        s,
+        now,
+      ).state
+    }
+    const board = runMinisterTool('get_board', {}, s, now).result as {
+      fixedFacts: { name: string; amount: number; months: number }[]
+    }
+    expect(board.fixedFacts).toEqual([
+      expect.objectContaining({ name: 'Husleie', amount: 12_500, months: 3 }),
+    ])
+  })
+
   it('lister utgifter for valgt måned', () => {
     let s = emptyState()
     s = runMinisterTool(

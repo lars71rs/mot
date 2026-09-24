@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   coverageCopy,
   dataCoverage,
+  dominantMonthKey,
   dumpKickMessage,
   inPocket,
   incomeThisMonth,
@@ -96,6 +97,11 @@ describe('kart over forbruk', () => {
     ])
     expect(three.enoughForPatterns).toBe(true)
     expect(coverageCopy(three)).toMatch(/gjentar/)
+  })
+
+  it('dumpet måned er den med flest poster i filen', () => {
+    expect(dominantMonthKey(['2026-08-01', '2026-08-15', '2026-09-02'])).toBe('2026-08')
+    expect(dominantMonthKey(['2026-07-31', '2026-07-01'])).toBe('2026-07')
   })
 
   it('kick etter dump peker på kartmåneden og dekning', () => {

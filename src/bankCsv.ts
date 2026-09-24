@@ -5,6 +5,8 @@ export type BankRow = {
   amount: number
   text: string
   direction: 'out' | 'in'
+  saldo?: number
+  saldoMismatch?: boolean
 }
 
 export type ParseResult = {
@@ -70,6 +72,7 @@ const IN_KEYS = [
   'credit',
 ]
 const AMOUNT_KEYS = ['beløp', 'belop', 'amount', 'belopp']
+const SALDO_KEYS = ['saldo', 'balance']
 
 function stripBom(s: string): string {
   return s.replace(/^\uFEFF/, '')
@@ -341,7 +344,9 @@ function parseStatementLine(line: string): BankRow | null {
   if (tx.value < 0 || /-$/.test(tx.raw.replace(/\s/g, ''))) direction = 'out'
   else if (IN_HINT.test(text)) direction = 'in'
   else direction = 'out'
-  return { date, amount: Math.abs(tx.value), text, direction }
+  const last = amounts[amounts.length - 1]
+  const saldo = amounts.length >= 2 ? last.value : undefined
+  return { date, amount: Math.abs(tx.value), text, direction, saldo }
 }
 
 export function parseBankText(text: string): ParseResult {
@@ -383,7 +388,7 @@ export function parseBankText(text: string): ParseResult {
   if (rows.length === 0) {
     return { rows: [], skipped, error: 'Fant ingen transaksjoner i teksten.' }
   }
-  return { rows, skipped, error: null }
+  return { rows: checkSaldoChain(rows), skipped, error: null }
 }
 
 function looksLikeCsv(raw: string): boolean {
@@ -429,6 +434,8 @@ export function parseBankCsv(raw: string): ParseResult {
   const amountI = findCol(headers, AMOUNT_KEYS, used)
   if (amountI >= 0) used.add(amountI)
   const textI = findCol(headers, TEXT_KEYS, used)
+  if (textI >= 0) used.add(textI)
+  const saldoI = findCol(headers, SALDO_KEYS, used)
   if (dateI < 0 || (outI < 0 && inI < 0 && amountI < 0)) {
     return {
       rows: [],
@@ -474,13 +481,80 @@ export function parseBankCsv(raw: string): ParseResult {
       skipped++
       continue
     }
-    rows.push({ date, amount, text: label, direction })
+    const saldoRaw = saldoI >= 0 ? parseNokAmount(cols[saldoI] ?? '') : null
+    rows.push({
+      date,
+      amount,
+      text: label,
+      direction,
+      saldo: saldoRaw === null ? undefined : saldoRaw,
+    })
   }
 
   if (rows.length === 0) {
     return { rows: [], skipped, error: 'Ingen transaksjoner å lese i filen.' }
   }
-  return { rows, skipped, error: null }
+  return { rows: checkSaldoChain(rows), skipped, error: null }
+}
+
+const SALDO_TOL = 2
+
+function signedDelta(row: BankRow): number {
+  return row.direction === 'in' ? row.amount : -row.amount
+}
+
+/** Newest-first: saldo[i] = saldo[i+1] + delta[i]. Oldest-first: saldo[i+1] = saldo[i] + delta[i+1]. */
+export function checkSaldoChain(rows: BankRow[]): BankRow[] {
+  const withSaldo: number[] = []
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i].saldo != null) withSaldo.push(i)
+  }
+  if (withSaldo.length < 2) return rows
+
+  const pairs: [number, number][] = []
+  for (let k = 0; k < withSaldo.length - 1; k++) {
+    pairs.push([withSaldo[k], withSaldo[k + 1]])
+  }
+
+  let newestHits = 0
+  let oldestHits = 0
+  for (const [a, b] of pairs) {
+    const sa = rows[a].saldo as number
+    const sb = rows[b].saldo as number
+    if (Math.abs(sa - (sb + signedDelta(rows[a]))) <= SALDO_TOL) newestHits++
+    if (Math.abs(sb - (sa + signedDelta(rows[b]))) <= SALDO_TOL) oldestHits++
+  }
+
+  if (newestHits === 0 && oldestHits === 0) {
+    const bad = new Set<number>()
+    for (const [a, b] of pairs) {
+      const jump = Math.abs((rows[a].saldo as number) - (rows[b].saldo as number))
+      const errA = Math.abs(Math.abs(signedDelta(rows[a])) - jump)
+      const errB = Math.abs(Math.abs(signedDelta(rows[b])) - jump)
+      if (errA <= SALDO_TOL && errB > SALDO_TOL) bad.add(b)
+      else if (errB <= SALDO_TOL && errA > SALDO_TOL) bad.add(a)
+      else if (errA > errB * 2) bad.add(a)
+      else if (errB > errA * 2) bad.add(b)
+      else {
+        bad.add(a)
+        bad.add(b)
+      }
+    }
+    return rows.map((r, i) => (bad.has(i) ? { ...r, saldoMismatch: true } : r))
+  }
+
+  const newestFirst = newestHits >= oldestHits
+  const bad = new Set<number>()
+  for (const [a, b] of pairs) {
+    const sa = rows[a].saldo as number
+    const sb = rows[b].saldo as number
+    if (newestFirst) {
+      if (Math.abs(sa - (sb + signedDelta(rows[a]))) > SALDO_TOL) bad.add(a)
+    } else if (Math.abs(sb - (sa + signedDelta(rows[b]))) > SALDO_TOL) {
+      bad.add(b)
+    }
+  }
+  return rows.map((r, i) => (bad.has(i) ? { ...r, saldoMismatch: true } : r))
 }
 
 export function expenseKey(date: string, amount: number, text: string): string {

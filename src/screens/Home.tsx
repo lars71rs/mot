@@ -13,6 +13,7 @@ import {
   spentThisMonth,
   visibleMonths,
 } from '../map'
+import { fixedFacts } from '../recurring'
 import { useStore } from '../store'
 import { categoryLabel, type ExpenseCategory } from '../types'
 
@@ -66,6 +67,7 @@ export function Home({
   const spent = spentThisMonth(state.expenses, view)
   const leftover = leftoverThisMonth(state.expenses, view)
   const cover = dataCoverage(state.expenses)
+  const facts = fixedFacts(state.expenses)
   const categories = spentByCategory(state.expenses, view)
   const txs = monthExpenses(state.expenses, view)
   const shown = txs.filter((e) => {
@@ -222,6 +224,27 @@ export function Home({
               )}
             </section>
           </div>
+
+          {facts.length > 0 && (
+            <section className="kart-card">
+              <p className="kicker">Faste · tre treff</p>
+              <p className="hint">Kom tre måneder. Ikke gjetning.</p>
+              <ul className="kart-fixed">
+                {facts.map((f) => (
+                  <li key={f.name}>
+                    <span>
+                      <strong>{f.name}</strong>
+                      <em>
+                        {f.months} måneder
+                        {f.category ? ` · ${categoryLabel(f.category)}` : ''}
+                      </em>
+                    </span>
+                    <b>{formatNok(f.amount)}</b>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section className="kart-card">
             <p className="kicker">Utgifter etter kategori</p>
